@@ -35,6 +35,11 @@ def checkTensorflow():
 checkTensorflow()
 
 
+def createIfNecessaryDir(path):
+    """Creates, if needed, a directory"""
+    if not RUNNING_IN_COLAB and not path.exists():
+        path.mkdir()
+
 def plotTrainingHistory(folder, title, filename, history, bestEpoch):
     """Plot training history"""
     fig = plt.figure()
