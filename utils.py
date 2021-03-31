@@ -10,6 +10,7 @@ from colab_test import RUNNING_IN_COLAB
 from keras.callbacks import Callback
 
 import math
+import os
 
 
 def checkTensorflow():
@@ -39,6 +40,7 @@ def createIfNecessaryDir(path):
     """Creates, if needed, a directory"""
     if not RUNNING_IN_COLAB and not path.exists():
         path.mkdir()
+
 
 def plotTrainingHistory(folder, title, filename, history, bestEpoch):
     """Plot training history"""
@@ -154,33 +156,34 @@ def plotConfusionMatrix(folder, title, filename, categories, y_pred, y_real):
         fig.savefig(folder / f"{filename}.png", dpi=100)
 
 
+def saveModelSummary(folder, name, model):
+    filename = None
+    if RUNNING_IN_COLAB:
+        # On Google Colab is better to show the image
+        filename = f"{name.lower()}"
+        model.summary()
+    else:
+        filename = folder / f"{name.lower()}"
+        with open(f"{filename}.txt", "w") as f:
+            model.summary(print_fn=lambda x: f.write(x + "\n"))
+            f.close()
+
+    # Model Summary Image
+    tf.keras.utils.plot_model(
+        model,
+        to_file=f"{filename}.png",
+        show_shapes=True,
+        show_layer_names=True,
+        rankdir="TB",
+        expand_nested=False,
+        dpi=96,
+    )
+
+
 def saveModelsSummary(folder, models):
     """Save models info"""
     for (name, model) in models:
-        filename = None
-        if RUNNING_IN_COLAB:
-            # On Google Colab is better to show the image
-            filename = f"{name.lower()}"
-            model.summary()
-        else:
-            filename = folder / f"{name.lower()}"
-            with open(f"{filename}.txt", "w") as f:
-                model.summary(print_fn=lambda x: f.write(x + "\n"))
-                f.close()
-
-        # Model Summary Image
-        tf.keras.utils.plot_model(
-            model,
-            to_file=f"{filename}.png",
-            show_shapes=True,
-            show_layer_names=True,
-            rankdir="TB",
-            expand_nested=False,
-            dpi=96,
-        )
-
-        # Save Model Architecture
-        model.save(filename)
+        saveModelSummary(folder, name, model)
 
 
 class BestEpochCallback(Callback):
@@ -215,3 +218,14 @@ class BestEpochCallback(Callback):
             self.bestWeights = self.model.save_weights(
                 self.weights_filename, overwrite=True
             )
+
+
+def getDirSize(folder):
+    """Get the size of a directory in bytes"""
+    # Based on https://www.tutorialspoint.com/How-to-calculate-a-directory-size-using-Python
+    totalSize = 0
+    for path, _, files in os.walk(folder):
+        for f in files:
+            fp = os.path.join(path, f)
+            totalSize += os.path.getsize(fp)
+    return totalSize

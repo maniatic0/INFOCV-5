@@ -20,9 +20,10 @@ createIfNecessaryDir(STANFORD_TRAINING)
 STANFORD_TESTING = STANFORD / "testing"
 createIfNecessaryDir(STANFORD_TESTING)
 
-STANFORD_BATCH_SIZE = 64
-STANFORD_IMAGE_SIZE = (128, 128)
-STANFORD_IMAGE_SHAPE = (128, 128, 3)
+BATCH_SIZE = 64
+IMAGE_SIZE = (128, 128)
+IMAGE_SHAPE = (128, 128, 3)
+STANFORD_NO_CLASSES = 40
 
 
 def preprocessStanfordData():
@@ -87,8 +88,8 @@ def loadStanfordDatasets():
         label_mode="int",
         class_names=None,
         color_mode="rgb",
-        batch_size=STANFORD_BATCH_SIZE,
-        image_size=STANFORD_IMAGE_SIZE,
+        batch_size=BATCH_SIZE,
+        image_size=IMAGE_SIZE,
         shuffle=True,
         seed=rand_seed,
         validation_split=VAL_SPLIT,
@@ -103,8 +104,8 @@ def loadStanfordDatasets():
         label_mode="int",
         class_names=None,
         color_mode="rgb",
-        batch_size=STANFORD_BATCH_SIZE,
-        image_size=STANFORD_IMAGE_SIZE,
+        batch_size=BATCH_SIZE,
+        image_size=IMAGE_SIZE,
         shuffle=True,
         seed=rand_seed,
         validation_split=VAL_SPLIT,
@@ -119,8 +120,8 @@ def loadStanfordDatasets():
         label_mode="int",
         class_names=None,
         color_mode="rgb",
-        batch_size=STANFORD_BATCH_SIZE,
-        image_size=STANFORD_IMAGE_SIZE,
+        batch_size=BATCH_SIZE,
+        image_size=IMAGE_SIZE,
         shuffle=True,
         seed=None,
         validation_split=None,
@@ -134,7 +135,7 @@ def loadStanfordDatasets():
 
 def colorPreprocessingLayer():
     preprocessing_layer = Sequential(
-        [Rescaling(1.0 / 255, input_shape=STANFORD_IMAGE_SHAPE), RandomContrast(0.1)],
+        [Rescaling(1.0 / 255, input_shape=IMAGE_SHAPE), RandomContrast(0.1)],
         name="Stanford_Preprocessing",
     )
     return preprocessing_layer
