@@ -149,7 +149,7 @@ def plotConfusionMatrix(folder, title, filename, categories, y_pred, y_real):
         fig.savefig(folder / f"{filename}.png", dpi=100)
 
 
-def saveModelsSummary(models):
+def saveModelsSummary(folder, models):
     """Save models info"""
     for (name, model) in models:
         filename = None
@@ -158,7 +158,7 @@ def saveModelsSummary(models):
             filename = f"{name.lower()}"
             model.summary()
         else:
-            filename = MODELS_FOLDER / f"{name.lower()}"
+            filename = folder / f"{name.lower()}"
             with open(f"{filename}.txt", "w") as f:
                 model.summary(print_fn=lambda x: f.write(x + "\n"))
                 f.close()
