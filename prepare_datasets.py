@@ -8,18 +8,17 @@ from tensorflow.keras.layers.experimental.preprocessing import Rescaling, Random
 import numpy as np
 
 import colab_test
+from utils import createIfNecessaryDir
 
 ROOT = Path(".") / "datasets"
 
 STANFORD = ROOT / "Stanford40"
 
 STANFORD_TRAINING = STANFORD / "training"
-if not colab_test.RUNNING_IN_COLAB and not STANFORD_TRAINING.exists():
-    STANFORD_TRAINING.mkdir()
+createIfNecessaryDir(STANFORD_TRAINING)
 
 STANFORD_TESTING = STANFORD / "testing"
-if not colab_test.RUNNING_IN_COLAB and not STANFORD_TESTING.exists():
-    STANFORD_TESTING.mkdir()
+createIfNecessaryDir(STANFORD_TESTING)
 
 STANFORD_BATCH_SIZE = 64
 STANFORD_IMAGE_SIZE = (128, 128)
@@ -133,7 +132,7 @@ def loadStanfordDatasets():
     return training, validation, testing
 
 
-def stanfordDataPreprocessingLayer():
+def colorPreprocessingLayer():
     preprocessing_layer = Sequential(
         [Rescaling(1.0 / 255, input_shape=STANFORD_IMAGE_SHAPE), RandomContrast(0.1)],
         name="Stanford_Preprocessing",
