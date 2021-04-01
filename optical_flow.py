@@ -39,7 +39,7 @@ for file in glob.glob("*.avi"):
 			print("Can't receive frame (stream end?). Exiting ...")
 			break
 		f1 = 'frames/' + video.split(".")[0] + '.png'
-		#cv2.imwrite(f1 , frame)
+		cv2.imwrite(f1 , frame)
 
 		cap.release() #we close the video and we open it again cause it gives problems if i remember correctly
 
