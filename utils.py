@@ -44,28 +44,54 @@ def createIfNecessaryDir(path):
 
 def plotTrainingHistory(folder, title, filename, history, bestEpoch):
     """Plot training history"""
-    fig = plt.figure()
-    plt.axes()
-    plt.title(title)
-    plt.xlabel("Epoch")
-    plt.ylabel("Value")
-
-    plt.ylim(0.0, 2.0)
 
     # Calculate epoch info
     epoch_number = len(next(iter(history.values())))
+
+    # Create new Figure
+    fig = plt.figure()
+    plt.axes()
+    plt.title(f"{title} Loss.")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+
+    plt.ylim(0.0, 10.0)
     plt.xticks(range(1, epoch_number + 1))
 
     # Plot everything
     plt.plot(range(1, epoch_number + 1), history["loss"], label="Loss", color="r")
     plt.plot(
-        range(1, epoch_number + 1), history["accuracy"], label="Accuracy", color="gold"
-    )
-    plt.plot(
         range(1, epoch_number + 1),
         history["val_loss"],
         label="Validation Loss",
         color="b",
+    )
+    plt.axvline(x=bestEpoch + 1, label="Best Epoch", color="lime")
+
+    # Draw legend
+    plt.legend(loc="lower left")
+
+    fig.tight_layout()
+    if RUNNING_IN_COLAB:
+        # On Google Colab is better to show the image
+        plt.show()
+    else:
+        fig.savefig(folder / f"{filename}_loss.png", dpi=fig.dpi)
+
+
+    # Create new Figure
+    fig = plt.figure()
+    plt.axes()
+    plt.title(f"{title} Accuracy.")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+
+    plt.ylim(0.0, 1.0)
+    plt.xticks(range(1, epoch_number + 1))
+
+    # Draw everything
+    plt.plot(
+        range(1, epoch_number + 1), history["accuracy"], label="Accuracy", color="gold"
     )
     plt.plot(
         range(1, epoch_number + 1),
@@ -83,7 +109,7 @@ def plotTrainingHistory(folder, title, filename, history, bestEpoch):
         # On Google Colab is better to show the image
         plt.show()
     else:
-        fig.savefig(folder / f"{filename}.png", dpi=fig.dpi)
+        fig.savefig(folder / f"{filename}_acc.png", dpi=fig.dpi)
 
 
 def plotConfusionMatrix(
