@@ -25,7 +25,7 @@ TESTING_FOLDER = ROOT / "testing"
 createIfNecessaryDir(TESTING_FOLDER)
 
 
-def trainAndTestModel(name, model, training, validation, test):
+def trainAndTestModel(name, model, training, validation, test, confussion_res_pixel=(1920, 1080)):
     filename = name.lower()
 
     # Training parameters
@@ -96,6 +96,23 @@ def trainAndTestModel(name, model, training, validation, test):
             f'Model "{name}" with Testing Loss {test_loss:.4f}, Testing Accuracy {test_acc:.4f}, Validation Loss {val_loss:.4f} and Validation Accuracy {val_acc:.4f}'
         )
 
+    y_pred = model.predict(test)
+    y_pred = tf.argmax(y_pred, axis=1)
+    y_pred = y_pred.numpy()
+
+    y_test = np.concatenate([y for _, y in test], axis=0)
+
+    # Plot Confussion Matrix
+    plotConfusionMatrix(
+        TESTING_FOLDER,
+        f'Model "{name}" Training.',
+        f"{filename}-confusion",
+        test.class_names,
+        y_pred,
+        y_test,
+        confussion_res_pixel
+    )
+
     size = getDirSize(MODELS_FOLDER / filename)
 
     results = {
@@ -118,7 +135,7 @@ def main():
 
     saveModelSummary(MODELS_FOLDER, name_stanford, model_stanford)
     model_stanford, stanford_results = trainAndTestModel(
-        name_stanford, model_stanford, training, validation, testing
+        name_stanford, model_stanford, training, validation, testing, (10000, 10000)
     )
 
     with open(TESTING_FOLDER / "models_values.csv", "w") as f:

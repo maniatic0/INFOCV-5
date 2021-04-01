@@ -86,10 +86,10 @@ def plotTrainingHistory(folder, title, filename, history, bestEpoch):
         fig.savefig(folder / f"{filename}.png", dpi=fig.dpi)
 
 
-def plotConfusionMatrix(folder, title, filename, categories, y_pred, y_real):
+def plotConfusionMatrix(folder, title, filename, categories, y_pred, y_real, res_pixel=(1920, 1080)):
     """Confusion Matrix Plotting"""
     # Get the confusion matrix
-    cf_matrix = confusion_matrix(y_real, y_pred)
+    cf_matrix = confusion_matrix(y_real, y_pred).transpose() # Sklearn seems to use the weird convension of using rows for real class
     cf_normalized = cf_matrix / np.sum(cf_matrix)
 
     no_classes = len(categories)
@@ -103,9 +103,12 @@ def plotConfusionMatrix(folder, title, filename, categories, y_pred, y_real):
     for i in range(no_classes):
         # Get Row Info
         total_row = np.sum(cf_matrix[i, :])
-        correct_row = cf_matrix[i, i] / total_row
-        incorrect_row = (total_row - cf_matrix[i, i]) / total_row
-        xticklabels[
+        correct_row = 0
+        incorrect_row = 0
+        if total_row > 0:
+            correct_row = cf_matrix[i, i] / total_row
+            incorrect_row = (total_row - cf_matrix[i, i]) / total_row
+        yticklabels[
             i
         ] = f"{categories[i]}\nT: {total_row}\nC: {correct_row:.2%}\nW: {incorrect_row:.2%}"
 
@@ -116,11 +119,14 @@ def plotConfusionMatrix(folder, title, filename, categories, y_pred, y_real):
 
         # Get Col Info
         total_col = np.sum(cf_matrix[:, i])
-        correct_col = cf_matrix[i, i] / total_col
-        incorrect_col = (total_col - cf_matrix[i, i]) / total_col
-        yticklabels[
+        correct_col = 0
+        incorrect_col = 0
+        if  total_col > 0:
+            correct_col = cf_matrix[i, i] / total_col
+            incorrect_col = (total_col - cf_matrix[i, i]) / total_col
+        xticklabels[
             i
-        ] = f"{categories[i]}\nT: {total_row}\nC: {correct_col:.2%}\nW: {incorrect_col:.2%}"
+        ] = f"{categories[i]}\nT: {total_col}\nC: {correct_col:.2%}\nW: {incorrect_col:.2%}"
 
         for j in range(no_classes):
             cf_text[i][j] = f"T: {cf_matrix[i,j]}\nP: {cf_normalized[i,j]:.2%}"
@@ -146,7 +152,8 @@ def plotConfusionMatrix(folder, title, filename, categories, y_pred, y_real):
     plt.ylabel("Prediction Class")
     plt.xlabel("Real Class")
 
-    fig.set_size_inches(19.20, 10.80)  # 1920x1080
+    x_res, y_res = res_pixel
+    fig.set_size_inches(x_res/100.0, y_res/100.0)  # 1920x1080
     fig.tight_layout()
 
     if RUNNING_IN_COLAB:
