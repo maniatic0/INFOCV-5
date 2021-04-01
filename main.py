@@ -25,7 +25,9 @@ TESTING_FOLDER = ROOT / "testing"
 createIfNecessaryDir(TESTING_FOLDER)
 
 
-def trainAndTestModel(name, model, training, validation, test, confussion_res_pixel=(1920, 1080)):
+def trainAndTestModel(
+    name, model, training, validation, test, confussion_res_pixel=(1920, 1080)
+):
     filename = name.lower()
 
     # Training parameters
@@ -110,7 +112,7 @@ def trainAndTestModel(name, model, training, validation, test, confussion_res_pi
         test.class_names,
         y_pred,
         y_test,
-        confussion_res_pixel
+        confussion_res_pixel,
     )
 
     size = getDirSize(MODELS_FOLDER / filename)
