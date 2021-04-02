@@ -1,83 +1,131 @@
-from video2tfrecord import convert_videos_to_tfrecord
 from pathlib import Path
 import os, glob
+import math
+
 import colab_test
-import cv2
+from utils import createIfNecessaryDir
+from prepare_datasets import IMAGE_SIZE
 
 import numpy as np
+import cv2
 
-TVHI = Path(".") / "TV-HI"
+ROOT = Path(".") / "datasets"
 
-VIDEOS = TVHI / "tv_human_interactions_videos"
+TVHI = ROOT / "TV-HI"
 
-FRAMES = VIDEOS / "frames"
-if not colab_test.RUNNING_IN_COLAB and not FRAMES.exists():
-    FRAMES.mkdir()
+TVHI_VIDEOS = TVHI / "tv_human_interactions_videos"
 
-OPTICALFLOW = VIDEOS / "opticalflow"
-if not colab_test.RUNNING_IN_COLAB and not OPTICALFLOW.exists():
-    OPTICALFLOW.mkdir()
+TVHI_TRAINING = TVHI / "training"
+createIfNecessaryDir(TVHI_TRAINING)
 
+TVHI_TESTING = TVHI / "testing"
+createIfNecessaryDir(TVHI_TESTING)
 
-os.chdir(VIDEOS)
-for file in glob.glob("*.avi"):
+TVHI_CLASSES = ['handShake', 'highFive', 'hug', 'kiss']  # we ignore the negative class
+TVHI_CLASSES_INT_MAP = {}
+for i, label in enumerate(TVHI_CLASSES):
+    TVHI_CLASSES_INT_MAP[label] = i
 
-    video = os.path.basename(file)
+def processSet(folder, videos, labels):
 
-    # OBTAIN FRAME IN THE MIDDLE
-    cap = cv2.VideoCapture(video)
-    # print('opened ' + filename)
-    length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    print(length)
-    cap.set(cv2.CAP_PROP_POS_FRAMES, int(length / 2))
-    ret, frame = cap.read()
-    if not ret:
-        print("Can't receive frame (stream end?). Exiting ...")
-        break
-    f1 = "frames/" + video.split(".")[0] + ".png"
-    cv2.imwrite(f1, frame)
+    def getDigits(size):
+        return int(math.ceil(math.log(size, 10)))
 
-    cap.release()  # we close the video and we open it again cause it gives problems if i remember correctly
+    def paddInt(num, pad):
+        return str(num).rjust(pad, "0")
 
-    # NOW TIME TO WORK ON THE BIG GUNS
-    cap = cv2.VideoCapture(video)
-    position = 0
-    ret, frame1 = cap.read()
-    prvs = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
-    hsv = np.zeros_like(frame1)
-    hsv[..., 1] = 255
+    video_digits = getDigits(len(videos))
 
-    nframes = 12  # the number of frames we want. arbitrary
-    gap = int(length / nframes)
-    i = 0
-    while cap.isOpened():
-        ret, frame1 = cap.read()
+    label_count = {}
+    for label in TVHI_CLASSES:
+        label_count[label] = 0
+
+    for i in range(len(videos)):
+        video = videos[i]
+        label = labels[i]
+
+        vi_num = label_count[label]
+        label_count[label] += 1
+
+        video_folder = folder / label / paddInt(vi_num, video_digits)
+        createIfNecessaryDir(video_folder)
+
+        cap = cv2.VideoCapture(str(TVHI_VIDEOS / video))
+        length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        frames_digits = getDigits(length)
+
+        i = 0
+        ret, frame = cap.read()
         if not ret:
-            print("Can't receive frame for video " + video + ". Exiting ...")
-            break
-        prvs = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
-        ret, frame2 = cap.read()
-        if not ret:
-            print("Can't receive frame for video " + video + ". Exiting ...")
-            break
-        next = cv2.cvtColor(frame2, cv2.COLOR_BGR2GRAY)
-
-        flow = cv2.calcOpticalFlowFarneback(prvs, next, None, 0.5, 3, 15, 3, 5, 1.2, 0)
-        mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
-        hsv[..., 0] = ang * 180 / np.pi / 2
-        hsv[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
+            print(f"Can't receive frame for video {video}. Skipping ...")
+            cap.release()
+            continue
+        
+        prvs = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        hsv = np.zeros_like(frame)
+        hsv[..., 1] = 255
         rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-        f2 = "opticalflow/" + video.split(".")[0] + "_" + str(i) + ".png"
-        cv2.imwrite(f2, rgb)
-        print("frame " + str(i) + " processed in file:  " + f2)
-        i = i + 1
-        position = position + gap
-        cap.set(cv2.CAP_PROP_POS_FRAMES, position)
-        if (position > length) or (i == nframes):
-            break
 
-    cap.release()
-    cv2.destroyAllWindows()
+        padded_index = paddInt(i, frames_digits)
+        cv2.imwrite(str(video_folder / f"rgb_{padded_index}.png"), cv2.resize(frame, IMAGE_SIZE, interpolation=cv2.INTER_LANCZOS4))
+        cv2.imwrite(str(video_folder / f"flow_{padded_index}.png"), cv2.resize(rgb, IMAGE_SIZE, interpolation=cv2.INTER_LANCZOS4))
+
+        i += 1
+        
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                print(f"Finished video {video}...")
+                break
+            curr = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            flow = cv2.calcOpticalFlowFarneback(prvs, curr, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+            mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+            hsv[..., 0] = ang * 180 / np.pi / 2
+            hsv[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
+            rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+            
+            padded_index = paddInt(i, frames_digits)
+            cv2.imwrite(str(video_folder / f"rgb_{padded_index}.png"), cv2.resize(frame, IMAGE_SIZE, interpolation=cv2.INTER_LANCZOS4))
+            cv2.imwrite(str(video_folder / f"flow_{padded_index}.png"), cv2.resize(rgb, IMAGE_SIZE, interpolation=cv2.INTER_LANCZOS4))
+
+            prvs = curr
+            i += 1
+
+        cap.release()
+
+def main():
+    set_1_indices = [[2,14,15,16,18,19,20,21,24,25,26,27,28,32,40,41,42,43,44,45,46,47,48,49,50],
+                 [1,6,7,8,9,10,11,12,13,23,24,25,27,28,29,30,31,32,33,34,35,44,45,47,48],
+                 [2,3,4,11,12,15,16,17,18,20,21,27,29,30,31,32,33,34,35,36,42,44,46,49,50],
+                 [1,7,8,9,10,11,12,13,14,16,17,18,22,23,24,26,29,31,35,36,38,39,40,41,42]]
+    set_2_indices = [[1,3,4,5,6,7,8,9,10,11,12,13,17,22,23,29,30,31,33,34,35,36,37,38,39],
+                    [2,3,4,5,14,15,16,17,18,19,20,21,22,26,36,37,38,39,40,41,42,43,46,49,50],
+                    [1,5,6,7,8,9,10,13,14,19,22,23,24,25,26,28,37,38,39,40,41,43,45,47,48],
+                    [2,3,4,5,6,15,19,20,21,25,27,28,30,32,33,34,37,43,44,45,46,47,48,49,50]]
+    classes = TVHI_CLASSES
+
+    # test set
+    set_1 = [f'{classes[c]}_{i:04d}.avi' for c in range(len(classes)) for i in set_1_indices[c]]
+    set_1_label = [f'{classes[c]}' for c in range(len(classes)) for i in set_1_indices[c]]
+    print(f'Set 1 to be used for test ({len(set_1)}):\n\t{set_1}')
+    print(f'Set 1 labels ({len(set_1_label)}):\n\t{set_1_label}\n')
+
+    # training set
+    set_2 = [f'{classes[c]}_{i:04d}.avi' for c in range(len(classes)) for i in set_2_indices[c]]
+    set_2_label = [f'{classes[c]}' for c in range(len(classes)) for i in set_2_indices[c]]
+    print(f'Set 2 to be used for train and validation ({len(set_2)}):\n\t{set_2}')
+    print(f'Set 2 labels ({len(set_2_label)}):\n\t{set_2_label}')
+
+    for label in classes:
+        createIfNecessaryDir(TVHI_TRAINING / label)
+        createIfNecessaryDir(TVHI_TESTING / label)
+
+    processSet(TVHI_TRAINING, set_2, set_2_label)
+    processSet(TVHI_TESTING, set_1, set_1_label)
 
 
-print("we made it")
+if __name__ == '__main__':
+    main()
+    
