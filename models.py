@@ -1,4 +1,7 @@
-from prepare_datasets import *
+from prepare_datasets import colorPreprocessingLayer, STANFORD_NO_CLASSES, IMAGE_SHAPE
+from optical_flow import TVHI_NO_CLASSES
+
+import tensorflow as tf
 
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import (
@@ -35,8 +38,24 @@ def stanfordModel():
     return ("Stanford", model)
 
 
-def stepOneModel(stanfordModel):
-    return ("HTV", None)
+def transferModel(stanfordModel):
+    prediction_layer = tf.keras.layers.Dense(TVHI_NO_CLASSES, activation="softmax")
+
+    inputs = tf.keras.Input(shape=IMAGE_SHAPE)
+    x = stanfordModel(inputs, training=True)
+    x = tf.keras.layers.Dense(STANFORD_NO_CLASSES)(x)
+    x = tf.keras.layers.Dropout(0.2)(x)
+    outputs = prediction_layer(x)
+    model = tf.keras.Model(inputs, outputs, name="Transfer")
+
+    # Compile for training
+    model.compile(
+        loss=sparse_categorical_crossentropy,
+        optimizer=Adam(learning_rate=0.01),
+        metrics=["accuracy"],
+    )
+
+    return ("Transfer", model)
 
 
 def opticalFlowModel():

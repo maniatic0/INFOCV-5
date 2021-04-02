@@ -1,12 +1,23 @@
-from utils import *
-from prepare_datasets import *
-from models import *
-from colab_test import *
+from utils import (
+    BestEpochCallback,
+    createIfNecessaryDir,
+    plotTrainingHistory,
+    plotConfusionMatrix,
+    getDirSize,
+    saveModelSummary,
+)
+from prepare_datasets import loadStanfordDatasets
+from optical_flow import loadTVHIRGB
+from models import stanfordModel, transferModel, opticalFlowModel, twoStreamsModel
+from colab_test import RUNNING_IN_COLAB
 
 from pathlib import Path
 import tempfile
 import csv
+import math
 
+import numpy as np
+import tensorflow as tf
 from keras.callbacks import EarlyStopping
 
 ROOT = Path(".") / "results"
@@ -57,6 +68,7 @@ def trainAndTestModel(
         best_epoch = BestEpochCallback(tmpdirname)
         callbacks.append(best_epoch)
 
+        print(f'Training: "{name}"')
         history = model.fit(
             training,
             batch_size=batch_size,
@@ -95,7 +107,7 @@ def trainAndTestModel(
         )
 
         print(
-            f'Model "{name}" with Testing Loss {test_loss:.4f}, Testing Accuracy {test_acc:.4f}, Validation Loss {val_loss:.4f} and Validation Accuracy {val_acc:.4f}'
+            f'Model "{name}" with Testing Loss {test_loss:.4f}, Testing Accuracy {test_acc:.4f}, Validation Loss {val_loss:.4f} and Validation Accuracy {val_acc:.4f}\n'
         )
 
     y_pred = model.predict(test)
@@ -132,14 +144,42 @@ def trainAndTestModel(
 
 def main():
 
-    training, validation, testing = loadStanfordDatasets()
+    # Load Datasets
+    training_stanford, validation_stanford, testing_stanford = loadStanfordDatasets()
+    training_tvhi_rgb, validation_tvhi_rgb, testing_tvhi_rgb = loadTVHIRGB()
+
+    # Load First Model
     name_stanford, model_stanford = stanfordModel()
 
+    # Save First Model Summary
     saveModelSummary(MODELS_FOLDER, name_stanford, model_stanford)
-    model_stanford, stanford_results = trainAndTestModel(
-        name_stanford, model_stanford, training, validation, testing, (10000, 10000)
+
+    # Train First Model
+    model_stanford, results_stanford = trainAndTestModel(
+        name_stanford,
+        model_stanford,
+        training_stanford,
+        validation_stanford,
+        testing_stanford,
+        (10000, 10000),
     )
 
+    # Load Second Model
+    name_transfer, model_transfer = transferModel(model_stanford)
+
+    # Save Second Model Summary
+    saveModelSummary(MODELS_FOLDER, name_transfer, model_transfer)
+
+    # Train Second Model
+    model_transfer, results_transfer = trainAndTestModel(
+        name_transfer,
+        model_transfer,
+        training_tvhi_rgb,
+        validation_tvhi_rgb,
+        testing_tvhi_rgb,
+    )
+
+    # Save Results
     with open(TESTING_FOLDER / "models_values.csv", "w") as f:
         fieldnames = [
             "model_name",
@@ -153,7 +193,8 @@ def main():
         writer = csv.DictWriter(f, fieldnames=fieldnames)
 
         writer.writeheader()
-        writer.writerow(stanford_results)
+        writer.writerow(results_stanford)
+        writer.writerow(results_transfer)
 
 
 if __name__ == "__main__":
