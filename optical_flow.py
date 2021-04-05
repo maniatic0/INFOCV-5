@@ -24,7 +24,8 @@ createIfNecessaryDir(TVHI_TESTING)
 
 TVHI_CLASSES = ["handShake", "highFive", "hug", "kiss"]  # we ignore the negative class
 TVHI_NO_CLASSES = len(TVHI_CLASSES)
-TVHI_STACK_SIZE = 16
+TVHI_STACK_SIZE = 8
+TVHI_FLOW_SHAPE = (TVHI_STACK_SIZE, *IMAGE_SHAPE)
 
 
 def loadRGBDataset(folder_pattern):

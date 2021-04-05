@@ -7,7 +7,7 @@ from utils import (
     saveModelSummary,
 )
 from prepare_stanford import loadStanfordDatasets
-from optical_flow import loadTVHIRGB
+from optical_flow import loadTVHIRGB, loadFlowTVHI
 from models import stanfordModel, transferModel, opticalFlowModel, twoStreamsModel
 from colab_test import RUNNING_IN_COLAB
 
@@ -42,7 +42,7 @@ def trainAndTestModel(
     filename = name.lower()
 
     # Training parameters
-    no_epochs = 500
+    no_epochs = 2
     batch_size = 64
     verbosity = 1
 
@@ -147,14 +147,30 @@ def main():
     # Load Datasets
     training_stanford, validation_stanford, testing_stanford = loadStanfordDatasets()
     training_tvhi_rgb, validation_tvhi_rgb, testing_tvhi_rgb = loadTVHIRGB()
+    training_tvhi_flow, validation_tvhi_flow, testing_tvhi_flow = loadFlowTVHI()
 
-    # Load First Model
+    # Load Flow Model
+    name_flow, model_flow = opticalFlowModel()
+
+    # Save Flow Model Summary
+    saveModelSummary(MODELS_FOLDER, name_flow, model_flow)
+
+    # Train Flow Model
+    model_flow, results_flow = trainAndTestModel(
+        name_flow,
+        model_flow,
+        training_tvhi_flow,
+        validation_tvhi_flow,
+        testing_tvhi_flow,
+    )
+
+    # Load Stanford Model
     name_stanford, model_stanford = stanfordModel()
 
-    # Save First Model Summary
+    # Save Stanford Model Summary
     saveModelSummary(MODELS_FOLDER, name_stanford, model_stanford)
 
-    # Train First Model
+    # Train Stanford Model
     model_stanford, results_stanford = trainAndTestModel(
         name_stanford,
         model_stanford,
@@ -162,6 +178,21 @@ def main():
         validation_stanford,
         testing_stanford,
         (10000, 10000),
+    )
+
+    # Load Transfer Model
+    name_transfer, model_transfer = transferModel(model_stanford)
+
+    # Save Transfer Model Summary
+    saveModelSummary(MODELS_FOLDER, name_transfer, model_transfer)
+
+    # Train Transfer Model
+    model_transfer, results_transfer = trainAndTestModel(
+        name_transfer,
+        model_transfer,
+        training_tvhi_rgb,
+        validation_tvhi_rgb,
+        testing_tvhi_rgb,
     )
 
     # Load Second Model
@@ -195,6 +226,7 @@ def main():
         writer.writeheader()
         writer.writerow(results_stanford)
         writer.writerow(results_transfer)
+        writer.writerow(results_flow)
 
 
 if __name__ == "__main__":

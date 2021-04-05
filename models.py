@@ -1,16 +1,21 @@
 from prepare_stanford import colorPreprocessingLayer, STANFORD_NO_CLASSES, IMAGE_SHAPE
-from optical_flow import TVHI_NO_CLASSES
+from optical_flow import TVHI_NO_CLASSES, TVHI_FLOW_SHAPE
 
 import tensorflow as tf
 
+from tensorflow.keras import Model
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import (
     Dense,
     Flatten,
     Conv2D,
+    Conv3D,
     MaxPooling2D,
+    MaxPooling3D,
     Dropout,
     AveragePooling2D,
+    TimeDistributed,
+    Reshape
 )
 from tensorflow.keras.losses import sparse_categorical_crossentropy
 from tensorflow.keras.optimizers import Adam
@@ -39,14 +44,14 @@ def stanfordModel():
 
 
 def transferModel(stanfordModel):
-    prediction_layer = tf.keras.layers.Dense(TVHI_NO_CLASSES, activation="softmax")
+    prediction_layer = Dense(TVHI_NO_CLASSES, activation="softmax")
 
     inputs = tf.keras.Input(shape=IMAGE_SHAPE)
     x = stanfordModel(inputs, training=True)
-    x = tf.keras.layers.Dense(STANFORD_NO_CLASSES)(x)
-    x = tf.keras.layers.Dropout(0.2)(x)
+    x = Dense(STANFORD_NO_CLASSES)(x)
+    x = Dropout(0.2)(x)
     outputs = prediction_layer(x)
-    model = tf.keras.Model(inputs, outputs, name="Transfer")
+    model = Model(inputs, outputs, name="Transfer")
 
     # Compile for training
     model.compile(
@@ -59,7 +64,32 @@ def transferModel(stanfordModel):
 
 
 def opticalFlowModel():
-    return ("Optical_Flow", None)
+    inputs = tf.keras.Input(shape=TVHI_FLOW_SHAPE)
+    x = TimeDistributed(Conv2D(32, kernel_size=(3, 3), activation="relu"))(inputs) # Needs this due to time in the flow
+    x = TimeDistributed(Conv2D(32, kernel_size=(3, 3), activation="relu"))(x) # Needs this due to time in the flow
+    x = Conv3D(8, kernel_size=(3, 3, 3))(x)
+    x = MaxPooling3D(pool_size=(6, 1, 1))(x) # Crappy way of reducing dimentionality
+    #print(x.shape) # use this to debug dimentionality. It needs to be (None, 1, W, H, D)
+    x = Reshape(x.shape[2:])(x) # (None, 1, 122, 122, 64) -> (None, 122, 122, 64)
+    x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
+    x = MaxPooling2D(pool_size=(2, 2))(x)
+    x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
+    x = MaxPooling2D(pool_size=(2, 2))(x)
+    x = Flatten()(x)
+    x = Dense(256, activation="relu")(x)
+    x = Dense(128, activation="relu")(x)
+    outputs = Dense(TVHI_NO_CLASSES, activation="softmax")(x)
+    model = Model(inputs, outputs, name="Optical_Flow")
+
+
+    # Compile for training
+    model.compile(
+        loss=sparse_categorical_crossentropy,
+        optimizer=Adam(learning_rate=0.01),
+        metrics=["accuracy"],
+    )
+
+    return ("Optical_Flow", model)
 
 
 def twoStreamsModel(oneModel, flowModel):
