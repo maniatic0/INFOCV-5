@@ -1,4 +1,4 @@
-from prepare_datasets import colorPreprocessingLayer, STANFORD_NO_CLASSES, IMAGE_SHAPE
+from prepare_stanford import colorPreprocessingLayer, STANFORD_NO_CLASSES, IMAGE_SHAPE
 from optical_flow import TVHI_NO_CLASSES
 
 import tensorflow as tf

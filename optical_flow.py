@@ -4,7 +4,7 @@ import math
 
 import colab_test
 from utils import createIfNecessaryDir
-from prepare_datasets import IMAGE_SIZE, BATCH_SIZE
+from prepare_stanford import IMAGE_SIZE, BATCH_SIZE
 
 import numpy as np
 import cv2

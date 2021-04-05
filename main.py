@@ -6,7 +6,7 @@ from utils import (
     getDirSize,
     saveModelSummary,
 )
-from prepare_datasets import loadStanfordDatasets
+from prepare_stanford import loadStanfordDatasets
 from optical_flow import loadTVHIRGB
 from models import stanfordModel, transferModel, opticalFlowModel, twoStreamsModel
 from colab_test import RUNNING_IN_COLAB
@@ -42,7 +42,7 @@ def trainAndTestModel(
     filename = name.lower()
 
     # Training parameters
-    no_epochs = 2
+    no_epochs = 500
     batch_size = 64
     verbosity = 1
 
