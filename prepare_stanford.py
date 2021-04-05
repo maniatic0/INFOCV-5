@@ -24,6 +24,7 @@ BATCH_SIZE = 64
 IMAGE_SIZE = (128, 128)
 IMAGE_SHAPE = (128, 128, 3)
 STANFORD_NO_CLASSES = 40
+VAL_SPLIT = 0.1
 
 
 def preprocessStanfordData():
@@ -79,7 +80,6 @@ def loadStanfordDatasets():
     print(cardinality(training).numpy())
     print(training.class_names)
     """
-    VAL_SPLIT = 0.1
     rand_seed = int(datetime.now().timestamp())
 
     training = image_dataset_from_directory(

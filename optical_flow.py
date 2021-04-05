@@ -4,7 +4,7 @@ import math
 
 import colab_test
 from utils import createIfNecessaryDir
-from prepare_stanford import IMAGE_SIZE, BATCH_SIZE
+from prepare_stanford import IMAGE_SIZE, IMAGE_SHAPE, BATCH_SIZE, VAL_SPLIT
 
 import numpy as np
 import cv2
@@ -24,6 +24,7 @@ createIfNecessaryDir(TVHI_TESTING)
 
 TVHI_CLASSES = ["handShake", "highFive", "hug", "kiss"]  # we ignore the negative class
 TVHI_NO_CLASSES = len(TVHI_CLASSES)
+TVHI_STACK_SIZE = 16
 
 
 def loadRGBDataset(folder_pattern):
@@ -55,8 +56,6 @@ def loadRGBDataset(folder_pattern):
         img = decode_img(img)
         return img, label
 
-    
-
     list_ds = list_ds.map(
         process_path, num_parallel_calls=tf.data.AUTOTUNE, deterministic=False
     )
@@ -68,14 +67,80 @@ def loadRGBDataset(folder_pattern):
 
 
 def loadTVHIRGB():
-    VAL_SPLIT = 0.1
-
     testing = loadRGBDataset(TVHI_TESTING / "**" / "rgb_*")
-    total = loadRGBDataset(TVHI_TRAINING / "**" / "rgb_*")
+    total_training = loadRGBDataset(TVHI_TRAINING / "**" / "rgb_*")
 
-    val_size = int(tf.data.experimental.cardinality(total).numpy() * VAL_SPLIT)
-    training = total.skip(val_size)
-    validation = total.take(val_size)
+    val_size = int(tf.data.experimental.cardinality(total_training).numpy() * VAL_SPLIT)
+    training = total_training.skip(val_size)
+    validation = total_training.take(val_size)
+
+    return training, validation, testing
+
+
+def loadFlowDataset(folder_pattern, image_pattern):
+    dir_glob = glob.glob(str(folder_pattern), recursive=True)
+    final_stacks = []
+    for folder in dir_glob:
+        img_glob = glob.glob(str(Path(folder) / image_pattern), recursive=True)
+        img_glob.sort()
+        for i in range(TVHI_STACK_SIZE - 1, len(img_glob)):
+            img_stack = [""] * TVHI_STACK_SIZE
+            for j in range(TVHI_STACK_SIZE):
+                img_stack[j] = img_glob[i - TVHI_STACK_SIZE + j + 1]
+            final_stacks.append(img_stack)
+
+    list_ds = tf.data.Dataset.from_tensor_slices(final_stacks)
+    list_ds = list_ds.shuffle(len(final_stacks), reshuffle_each_iteration=False)
+
+    class_names = np.array(TVHI_CLASSES)
+
+    def get_label(file_path):
+        # convert the path to a list of path components
+        parts = tf.strings.split(file_path, os.path.sep)
+        # The second to last is the class-directory
+        one_hot = parts[-3] == class_names
+        # Integer encode the label
+        return tf.argmax(one_hot)
+
+    def decode_img(img):
+        # convert the compressed string to a 3D uint8 tensor
+        img = tf.image.decode_png(img, channels=3)
+        # resize the image to the desired size
+        return tf.image.resize(img, [IMAGE_SIZE[0], IMAGE_SIZE[1]])
+
+    def process_path(file_path):
+        # load the raw data from the file as a string
+        img = tf.io.read_file(file_path)
+        img = decode_img(img)
+        return img
+
+    def process_stack(stack):
+        label = get_label(tf.gather(stack, 0, axis=0))
+        processed = tf.map_fn(
+            process_path,
+            stack,
+            fn_output_signature=tf.TensorSpec(
+                IMAGE_SHAPE, dtype=tf.dtypes.float32, name=None
+            ),
+        )
+        return processed, label
+
+    list_ds = list_ds.map(
+        process_stack, num_parallel_calls=tf.data.AUTOTUNE, deterministic=False
+    )
+    list_ds = list_ds.batch(BATCH_SIZE)
+
+    list_ds.class_names = TVHI_CLASSES
+    return list_ds
+
+
+def loadFlowTVHI():
+    testing = loadFlowDataset(TVHI_TESTING / "*" / "*", "flow_*.png")
+    total_training = loadFlowDataset(TVHI_TRAINING / "*" / "*", "flow_*.png")
+
+    val_size = int(tf.data.experimental.cardinality(total_training).numpy() * VAL_SPLIT)
+    training = total_training.skip(val_size)
+    validation = total_training.take(val_size)
 
     return training, validation, testing
 
