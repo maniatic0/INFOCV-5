@@ -67,8 +67,8 @@ def opticalFlowModel():
     inputs = tf.keras.Input(shape=TVHI_FLOW_SHAPE)
     x = TimeDistributed(Conv2D(32, kernel_size=(3, 3), activation="relu"))(inputs) # Needs this due to time in the flow
     x = TimeDistributed(Conv2D(32, kernel_size=(3, 3), activation="relu"))(x) # Needs this due to time in the flow
-    x = Conv3D(8, kernel_size=(3, 3, 3))(x)
-    x = MaxPooling3D(pool_size=(6, 1, 1))(x) # Crappy way of reducing dimentionality
+    x = Conv3D(8, kernel_size=(3, 3, 3))(x) # Maybe only use time distribution and then maxpooling 3d?
+    x = MaxPooling3D(pool_size=(6, 1, 1))(x) # Way of reducing dimentionality
     #print(x.shape) # use this to debug dimentionality. It needs to be (None, 1, W, H, D)
     x = Reshape(x.shape[2:])(x) # (None, 1, 122, 122, 64) -> (None, 122, 122, 64)
     x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)

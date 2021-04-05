@@ -149,21 +149,6 @@ def main():
     training_tvhi_rgb, validation_tvhi_rgb, testing_tvhi_rgb = loadTVHIRGB()
     training_tvhi_flow, validation_tvhi_flow, testing_tvhi_flow = loadFlowTVHI()
 
-    # Load Flow Model
-    name_flow, model_flow = opticalFlowModel()
-
-    # Save Flow Model Summary
-    saveModelSummary(MODELS_FOLDER, name_flow, model_flow)
-
-    # Train Flow Model
-    model_flow, results_flow = trainAndTestModel(
-        name_flow,
-        model_flow,
-        training_tvhi_flow,
-        validation_tvhi_flow,
-        testing_tvhi_flow,
-    )
-
     # Load Stanford Model
     name_stanford, model_stanford = stanfordModel()
 
@@ -208,6 +193,21 @@ def main():
         training_tvhi_rgb,
         validation_tvhi_rgb,
         testing_tvhi_rgb,
+    )
+
+    # Load Flow Model
+    name_flow, model_flow = opticalFlowModel()
+
+    # Save Flow Model Summary
+    saveModelSummary(MODELS_FOLDER, name_flow, model_flow)
+
+    # Train Flow Model
+    model_flow, results_flow = trainAndTestModel(
+        name_flow,
+        model_flow,
+        training_tvhi_flow,
+        validation_tvhi_flow,
+        testing_tvhi_flow,
     )
 
     # Save Results
