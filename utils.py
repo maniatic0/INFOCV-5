@@ -42,7 +42,7 @@ def createIfNecessaryDir(path):
         path.mkdir()
 
 
-def plotTrainingHistory(folder, title, filename, history, bestEpoch):
+def plotTrainingHistory(folder, title, filename, history, bestEpoch, res_pixel=(1920, 1080), max_y=10):
     """Plot training history"""
 
     # Calculate epoch info
@@ -55,8 +55,8 @@ def plotTrainingHistory(folder, title, filename, history, bestEpoch):
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
 
-    plt.ylim(0.0, 10.0)
-    plt.xticks(range(1, epoch_number + 1))
+    plt.ylim(0.0, max_y)
+    plt.xticks(range(1, epoch_number + 1, int(epoch_number * 0.1)))
 
     # Plot everything
     plt.plot(range(1, epoch_number + 1), history["loss"], label="Loss", color="r")
@@ -104,6 +104,8 @@ def plotTrainingHistory(folder, title, filename, history, bestEpoch):
     # Draw legend
     plt.legend(loc="lower left")
 
+    x_res, y_res = res_pixel
+    fig.set_size_inches(x_res / 100.0, y_res / 100.0)  # 1920x1080
     fig.tight_layout()
     if RUNNING_IN_COLAB:
         # On Google Colab is better to show the image

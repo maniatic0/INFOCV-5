@@ -37,7 +37,14 @@ createIfNecessaryDir(TESTING_FOLDER)
 
 
 def trainAndTestModel(
-    name, model, training, validation, test, confussion_res_pixel=(1920, 1080)
+    name,
+    model,
+    training,
+    validation,
+    test,
+    confussion_res_pixel=(1920, 1080),
+    history_res_pixel=(4096, 1080),
+    history_max_y=10,
 ):
     filename = name.lower()
 
@@ -95,6 +102,8 @@ def trainAndTestModel(
             filename,
             history.history,
             best_epoch.bestEpoch,
+            res_pixel=history_res_pixel,
+            max_y=history_max_y,
         )
 
         # Get and Print Results
@@ -193,6 +202,7 @@ def main():
         training_tvhi_rgb,
         validation_tvhi_rgb,
         testing_tvhi_rgb,
+        history_max_y=300,
     )
 
     # Load Flow Model
