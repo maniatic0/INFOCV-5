@@ -42,7 +42,9 @@ def createIfNecessaryDir(path):
         path.mkdir()
 
 
-def plotTrainingHistory(folder, title, filename, history, bestEpoch, res_pixel=(1920, 1080), max_y=10):
+def plotTrainingHistory(
+    folder, title, filename, history, bestEpoch, res_pixel=(1920, 1080), max_y=10
+):
     """Plot training history"""
 
     # Calculate epoch info
@@ -56,7 +58,7 @@ def plotTrainingHistory(folder, title, filename, history, bestEpoch, res_pixel=(
     plt.ylabel("Loss")
 
     plt.ylim(0.0, max_y)
-    plt.xticks(range(1, epoch_number + 1, int(epoch_number * 0.1)))
+    plt.xticks(range(1, epoch_number + 1, max(int(epoch_number * 0.1), 1)))
 
     # Plot everything
     plt.plot(range(1, epoch_number + 1), history["loss"], label="Loss", color="r")
@@ -77,7 +79,6 @@ def plotTrainingHistory(folder, title, filename, history, bestEpoch, res_pixel=(
         plt.show()
     else:
         fig.savefig(folder / f"{filename}_loss.png", dpi=fig.dpi)
-
 
     # Create new Figure
     fig = plt.figure()

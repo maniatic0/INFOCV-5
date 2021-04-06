@@ -7,7 +7,7 @@ from utils import (
     saveModelSummary,
 )
 from prepare_stanford import loadStanfordDatasets
-from optical_flow import loadTVHIRGB, loadFlowTVHI
+from optical_flow import loadTVHIRGB, loadFlowTVHI, loadDualTVHI
 from models import stanfordModel, transferModel, opticalFlowModel, twoStreamsModel
 from colab_test import RUNNING_IN_COLAB
 
@@ -157,6 +157,7 @@ def main():
     training_stanford, validation_stanford, testing_stanford = loadStanfordDatasets()
     training_tvhi_rgb, validation_tvhi_rgb, testing_tvhi_rgb = loadTVHIRGB()
     training_tvhi_flow, validation_tvhi_flow, testing_tvhi_flow = loadFlowTVHI()
+    training_tvhi_dual, validation_tvhi_dual, testing_tvhi_dual = loadDualTVHI()
 
     # Load Stanford Model
     name_stanford, model_stanford = stanfordModel()
@@ -220,6 +221,21 @@ def main():
         testing_tvhi_flow,
     )
 
+    # Load Two Stream Model
+    name_dual, model_dual = twoStreamsModel(model_transfer, model_flow)
+
+    # Save Two Stream Model Summary
+    saveModelSummary(MODELS_FOLDER, name_dual, model_dual)
+
+    # Train Two Stream Model
+    model_dual, results_dual = trainAndTestModel(
+        name_dual,
+        model_dual,
+        training_tvhi_dual,
+        validation_tvhi_dual,
+        testing_tvhi_dual,
+    )
+
     # Save Results
     with open(TESTING_FOLDER / "models_values.csv", "w") as f:
         fieldnames = [
@@ -237,6 +253,7 @@ def main():
         writer.writerow(results_stanford)
         writer.writerow(results_transfer)
         writer.writerow(results_flow)
+        writer.writerow(results_dual)
 
 
 if __name__ == "__main__":

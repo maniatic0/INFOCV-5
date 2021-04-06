@@ -146,6 +146,90 @@ def loadFlowTVHI():
     return training, validation, testing
 
 
+def loadDualDataset(folder_pattern, flow_pattern, rgb_pattern):
+    dir_glob = glob.glob(str(folder_pattern), recursive=True)
+    final_stacks = []
+    images = []
+    for folder in dir_glob:
+        flow_glob = glob.glob(str(Path(folder) / flow_pattern), recursive=True)
+        flow_glob.sort()
+        rgb_glob = glob.glob(str(Path(folder) / rgb_pattern), recursive=True)
+        rgb_glob.sort()
+        for i in range(TVHI_STACK_SIZE - 1, len(flow_glob)):
+            img_stack = [""] * TVHI_STACK_SIZE
+            for j in range(TVHI_STACK_SIZE):
+                img_stack[j] = flow_glob[i - TVHI_STACK_SIZE + j + 1]
+            final_stacks.append(img_stack)
+            images.append(rgb_glob[i])
+
+    stacks_ds = tf.data.Dataset.from_tensor_slices(final_stacks)
+    rgb_ds = tf.data.Dataset.from_tensor_slices(images)
+    label_ds = tf.data.Dataset.from_tensor_slices(images)
+
+    class_names = np.array(TVHI_CLASSES)
+
+    def get_label(file_path):
+        # convert the path to a list of path components
+        parts = tf.strings.split(file_path, os.path.sep)
+        # The second to last is the class-directory
+        one_hot = parts[-3] == class_names
+        # Integer encode the label
+        return tf.argmax(one_hot)
+
+    def decode_img(img):
+        # convert the compressed string to a 3D uint8 tensor
+        img = tf.image.decode_png(img, channels=3)
+        # resize the image to the desired size
+        return tf.image.resize(img, [IMAGE_SIZE[0], IMAGE_SIZE[1]])
+
+    def process_path(file_path):
+        # load the raw data from the file as a string
+        img = tf.io.read_file(file_path)
+        img = decode_img(img)
+        return img
+
+    def process_stack(stack):
+        processed = tf.map_fn(
+            process_path,
+            stack,
+            fn_output_signature=tf.TensorSpec(
+                IMAGE_SHAPE, dtype=tf.dtypes.float32, name=None
+            ),
+        )
+        return processed
+
+    stacks_ds = stacks_ds.map(
+        process_stack, num_parallel_calls=tf.data.AUTOTUNE, deterministic=True
+    )
+    rgb_ds = rgb_ds.map(
+        process_path, num_parallel_calls=tf.data.AUTOTUNE, deterministic=True
+    )
+    label_ds = label_ds.map(
+        get_label, num_parallel_calls=tf.data.AUTOTUNE, deterministic=True
+    )
+    input_ds = tf.data.Dataset.zip((rgb_ds, stacks_ds))
+    complete_ds = tf.data.Dataset.zip((input_ds, label_ds))
+
+    complete_ds = complete_ds.shuffle(len(images), reshuffle_each_iteration=False)
+    complete_ds = complete_ds.batch(BATCH_SIZE)
+
+    complete_ds.class_names = TVHI_CLASSES
+    return complete_ds
+
+
+def loadDualTVHI():
+    testing = loadDualDataset(TVHI_TESTING / "*" / "*", "flow_*.png", "rgb_*.png")
+    total_training = loadDualDataset(
+        TVHI_TRAINING / "*" / "*", "flow_*.png", "rgb_*.png"
+    )
+
+    val_size = int(tf.data.experimental.cardinality(total_training).numpy() * VAL_SPLIT)
+    training = total_training.skip(val_size)
+    validation = total_training.take(val_size)
+
+    return training, validation, testing
+
+
 def processSet(folder, videos, labels):
     def getDigits(size):
         return int(math.ceil(math.log(size, 10)))
