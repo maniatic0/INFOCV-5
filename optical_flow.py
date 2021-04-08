@@ -24,16 +24,22 @@ createIfNecessaryDir(TVHI_TESTING)
 
 TVHI_CLASSES = ["handShake", "highFive", "hug", "kiss"]  # we ignore the negative class
 TVHI_NO_CLASSES = len(TVHI_CLASSES)
-TVHI_STACK_SIZE = 8
+TVHI_STACK_SIZE = 16
 TVH_FLOW_SHAPE = (*IMAGE_SIZE, 2)
 TVHI_FLOW_SHAPE = (TVHI_STACK_SIZE, *TVH_FLOW_SHAPE)
 
 
-def loadRGBDataset(folder_pattern):
+def loadRGBDataset(folder_pattern, image_pattern):
     # based on https://www.tensorflow.org/tutorials/load_data/images
-    file_glob = glob.glob(str(folder_pattern), recursive=True)
-    list_ds = tf.data.Dataset.from_tensor_slices(file_glob)
-    list_ds = list_ds.shuffle(len(file_glob), reshuffle_each_iteration=False)
+    dir_glob = glob.glob(str(folder_pattern), recursive=True)
+    final_imgs = []
+    for folder in dir_glob:
+        img_glob = glob.glob(str(Path(folder) / image_pattern), recursive=True)
+        img_glob.sort()
+        i = int(len(img_glob) / 2)
+        final_imgs.append(img_glob[i])
+    list_ds = tf.data.Dataset.from_tensor_slices(final_imgs)
+    list_ds = list_ds.shuffle(len(final_imgs), reshuffle_each_iteration=False)
 
     class_names = np.array(TVHI_CLASSES)
 
@@ -69,10 +75,11 @@ def loadRGBDataset(folder_pattern):
 
 
 def loadTVHIRGB():
-    testing = loadRGBDataset(TVHI_TESTING / "**" / "rgb_*")
-    total_training = loadRGBDataset(TVHI_TRAINING / "**" / "rgb_*")
+    testing = loadRGBDataset(TVHI_TESTING / "*" / "*", "rgb_*.png")
+    total_training = loadRGBDataset(TVHI_TRAINING / "*" / "*", "rgb_*.png")
 
-    val_size = int(tf.data.experimental.cardinality(total_training).numpy() * VAL_SPLIT)
+    card = tf.data.experimental.cardinality(total_training).numpy()
+    val_size = max(int(card * VAL_SPLIT), 1)
     training = total_training.skip(val_size)
     validation = total_training.take(val_size)
 
@@ -85,11 +92,11 @@ def loadFlowDataset(folder_pattern, image_pattern):
     for folder in dir_glob:
         img_glob = glob.glob(str(Path(folder) / image_pattern), recursive=True)
         img_glob.sort()
-        for i in range(TVHI_STACK_SIZE - 1, len(img_glob)):
-            img_stack = [""] * TVHI_STACK_SIZE
-            for j in range(TVHI_STACK_SIZE):
-                img_stack[j] = img_glob[i - TVHI_STACK_SIZE + j + 1]
-            final_stacks.append(img_stack)
+        i = int(len(img_glob) / 2)
+        img_stack = [""] * TVHI_STACK_SIZE
+        for j in range(TVHI_STACK_SIZE):
+            img_stack[j] = img_glob[i - TVHI_STACK_SIZE + j + 1]
+        final_stacks.append(img_stack)
 
     list_ds = tf.data.Dataset.from_tensor_slices(final_stacks)
     list_ds = list_ds.shuffle(len(final_stacks), reshuffle_each_iteration=False)
@@ -148,7 +155,8 @@ def loadFlowTVHI():
     testing = loadFlowDataset(TVHI_TESTING / "*" / "*", "flow_*.png")
     total_training = loadFlowDataset(TVHI_TRAINING / "*" / "*", "flow_*.png")
 
-    val_size = int(tf.data.experimental.cardinality(total_training).numpy() * VAL_SPLIT)
+    card = tf.data.experimental.cardinality(total_training).numpy()
+    val_size = max(int(card * VAL_SPLIT), 1)
     training = total_training.skip(val_size)
     validation = total_training.take(val_size)
 
@@ -164,12 +172,12 @@ def loadDualDataset(folder_pattern, flow_pattern, rgb_pattern):
         flow_glob.sort()
         rgb_glob = glob.glob(str(Path(folder) / rgb_pattern), recursive=True)
         rgb_glob.sort()
-        for i in range(TVHI_STACK_SIZE - 1, len(flow_glob)):
-            img_stack = [""] * TVHI_STACK_SIZE
-            for j in range(TVHI_STACK_SIZE):
-                img_stack[j] = flow_glob[i - TVHI_STACK_SIZE + j + 1]
-            final_stacks.append(img_stack)
-            images.append(rgb_glob[i])
+        i = int(len(rgb_glob) / 2)
+        img_stack = [""] * TVHI_STACK_SIZE
+        for j in range(TVHI_STACK_SIZE):
+            img_stack[j] = flow_glob[i - TVHI_STACK_SIZE + j + 1]
+        final_stacks.append(img_stack)
+        images.append(rgb_glob[i])
 
     stacks_ds = tf.data.Dataset.from_tensor_slices(final_stacks)
     rgb_ds = tf.data.Dataset.from_tensor_slices(images)
@@ -246,7 +254,8 @@ def loadDualTVHI():
         TVHI_TRAINING / "*" / "*", "flow_*.png", "rgb_*.png"
     )
 
-    val_size = int(tf.data.experimental.cardinality(total_training).numpy() * VAL_SPLIT)
+    card = tf.data.experimental.cardinality(total_training).numpy()
+    val_size = max(int(card * VAL_SPLIT), 1)
     training = total_training.skip(val_size)
     validation = total_training.take(val_size)
 
