@@ -25,7 +25,8 @@ createIfNecessaryDir(TVHI_TESTING)
 TVHI_CLASSES = ["handShake", "highFive", "hug", "kiss"]  # we ignore the negative class
 TVHI_NO_CLASSES = len(TVHI_CLASSES)
 TVHI_STACK_SIZE = 8
-TVHI_FLOW_SHAPE = (TVHI_STACK_SIZE, *IMAGE_SHAPE)
+TVH_FLOW_SHAPE = (*IMAGE_SIZE, 2)
+TVHI_FLOW_SHAPE = (TVHI_STACK_SIZE, *TVH_FLOW_SHAPE)
 
 
 def loadRGBDataset(folder_pattern):
@@ -109,10 +110,18 @@ def loadFlowDataset(folder_pattern, image_pattern):
         # resize the image to the desired size
         return tf.image.resize(img, [IMAGE_SIZE[0], IMAGE_SIZE[1]])
 
+    def decode_flow(img):
+        img = tf.cast(img, tf.float32) / 255.0
+        img_hsv = tf.image.rgb_to_hsv(img)
+        channels = tf.unstack(img_hsv, axis=-1)
+        img_final = tf.stack([channels[0], channels[2]], axis=-1)
+        return img_final
+
     def process_path(file_path):
         # load the raw data from the file as a string
         img = tf.io.read_file(file_path)
         img = decode_img(img)
+        img = decode_flow(img)
         return img
 
     def process_stack(stack):
@@ -121,7 +130,7 @@ def loadFlowDataset(folder_pattern, image_pattern):
             process_path,
             stack,
             fn_output_signature=tf.TensorSpec(
-                IMAGE_SHAPE, dtype=tf.dtypes.float32, name=None
+                TVH_FLOW_SHAPE, dtype=tf.dtypes.float32, name=None
             ),
         )
         return processed, label
@@ -182,18 +191,32 @@ def loadDualDataset(folder_pattern, flow_pattern, rgb_pattern):
         # resize the image to the desired size
         return tf.image.resize(img, [IMAGE_SIZE[0], IMAGE_SIZE[1]])
 
+    def decode_flow(img):
+        img = tf.cast(img, tf.float32) / 255.0
+        img_hsv = tf.image.rgb_to_hsv(img)
+        channels = tf.unstack(img_hsv, axis=-1)
+        img_final = tf.stack([channels[0], channels[2]], axis=-1)
+        return img_final
+
     def process_path(file_path):
         # load the raw data from the file as a string
         img = tf.io.read_file(file_path)
         img = decode_img(img)
         return img
 
+    def process_flow(file_path):
+        # load the raw data from the file as a string
+        img = tf.io.read_file(file_path)
+        img = decode_img(img)
+        img = decode_flow(img)
+        return img
+
     def process_stack(stack):
         processed = tf.map_fn(
-            process_path,
+            process_flow,
             stack,
             fn_output_signature=tf.TensorSpec(
-                IMAGE_SHAPE, dtype=tf.dtypes.float32, name=None
+                TVH_FLOW_SHAPE, dtype=tf.dtypes.float32, name=None
             ),
         )
         return processed
