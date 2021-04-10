@@ -22,6 +22,10 @@ from tensorflow.keras.layers import (
 from tensorflow.keras.losses import sparse_categorical_crossentropy
 from tensorflow.keras.optimizers import Adam
 
+#you need to do:
+#pip install tensorflow-addons
+from tensorflow_addons.optimizers import CyclicalLearningRate
+
 def cyclicalLRate():
     cyclical_learning_rate = CyclicalLearningRate(
      initial_learning_rate=3e-7,
