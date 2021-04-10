@@ -1,5 +1,6 @@
 from prepare_stanford import colorPreprocessingLayer, STANFORD_NO_CLASSES, IMAGE_SHAPE
 from optical_flow import TVHI_NO_CLASSES, TVHI_FLOW_SHAPE
+from utils import CyclicalLearningRateLogger
 
 import tensorflow as tf
 
@@ -21,18 +22,14 @@ from tensorflow.keras.layers import (
 from tensorflow.keras.losses import sparse_categorical_crossentropy
 from tensorflow.keras.optimizers import Adam
 
-#you need to do:
-#pip install tensorflow-addons
-from tensorflow_addons.optimizers import CyclicalLearningRate
-
-
 def cyclicalLRate():
     cyclical_learning_rate = CyclicalLearningRate(
      initial_learning_rate=3e-7,
-     maximal_learning_rate=3e-5,
-     step_size=2360,
+     maximal_learning_rate=0.01,
+     step_size=1,
      scale_fn=lambda x: 1 / (2.0 ** (x - 1)),
      scale_mode='cycle')
+
     return cyclical_learning_rate
 
 # function for creating a naive inception block

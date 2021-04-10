@@ -152,7 +152,7 @@ def trainAndTestModel(
 
 
 def main():
-
+    
     # Load Datasets
     training_stanford, validation_stanford, testing_stanford = loadStanfordDatasets()
     training_tvhi_rgb, validation_tvhi_rgb, testing_tvhi_rgb = loadTVHIRGB()

@@ -12,6 +12,10 @@ from keras.callbacks import Callback
 import math
 import os
 
+#you need to do:
+#pip install tensorflow-addons
+from tensorflow_addons.optimizers import CyclicalLearningRate
+
 
 def checkTensorflow():
     print(f"Running in Collab: {RUNNING_IN_COLAB}")
@@ -269,3 +273,13 @@ def getDirSize(folder):
             fp = os.path.join(path, f)
             totalSize += os.path.getsize(fp)
     return totalSize
+
+
+
+
+class CyclicalLearningRateLogger(CyclicalLearningRate):
+
+    def __call__(self, step):
+        res = super(CyclicalLearningRateLogger, self).__call__(step)
+        logging.log(100, f"Learning Rate: {res}")
+        return res
