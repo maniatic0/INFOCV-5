@@ -21,6 +21,36 @@ from tensorflow.keras.layers import (
 from tensorflow.keras.losses import sparse_categorical_crossentropy
 from tensorflow.keras.optimizers import Adam
 
+#you need to do:
+#pip install tensorflow-addons
+from tensorflow_addons.optimizers import CyclicalLearningRate
+
+
+def cyclicalLRate():
+    cyclical_learning_rate = CyclicalLearningRate(
+     initial_learning_rate=3e-7,
+     maximal_learning_rate=3e-5,
+     step_size=2360,
+     scale_fn=lambda x: 1 / (2.0 ** (x - 1)),
+     scale_mode='cycle')
+    return cyclical_learning_rate
+
+# function for creating a naive inception block
+def inception_module(layer_in, f1, f2, f3):
+    # 1x1 conv
+    conv1 = Conv2D(f1, (1,1), padding='same', activation='relu')(layer_in)
+    # 3x3 conv
+    conv3 = Conv2D(f2, (3,3), padding='same', activation='relu')(layer_in)
+    # 5x5 conv
+    conv5 = Conv2D(f3, (5,5), padding='same', activation='relu')(layer_in)
+    # 3x3 max pooling
+    pool = MaxPooling2D((3,3), strides=(1,1), padding='same')(layer_in)
+    # concatenate filters, assumes filters/channels last
+    layer_out = concatenate([conv1, conv3, conv5, pool], axis=-1)
+    return layer_out
+
+
+
 
 def stanfordModel():
     model = Sequential(name="Stanford")
@@ -37,7 +67,7 @@ def stanfordModel():
     # Compile for training
     model.compile(
         loss=sparse_categorical_crossentropy,
-        optimizer=Adam(learning_rate=0.01),
+        optimizer=Adam(learning_rate=cyclicalLRate()),
         metrics=["accuracy"],
     )
 
