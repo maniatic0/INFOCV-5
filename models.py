@@ -29,8 +29,8 @@ from tensorflow_addons.optimizers import CyclicalLearningRate
 def cyclicalLRate():
     cyclical_learning_rate = CyclicalLearningRate(
      initial_learning_rate=3e-7,
-     maximal_learning_rate=0.01,
-     step_size=1,
+     maximal_learning_rate=3e-5,
+     step_size=1130,
      scale_fn=lambda x: 1 / (2.0 ** (x - 1)),
      scale_mode='cycle')
 
@@ -56,14 +56,15 @@ def inception_module(layer_in, f1, f2, f3):
 def stanfordModel():
     model = Sequential(name="Stanford")
     model.add(colorPreprocessingLayer())
-    model.add(Conv2D(32, kernel_size=(3, 3), activation="relu"))
+    model.add(Conv2D(256, kernel_size=(3, 3), activation="relu"))
+    model.add(Dropout(0.5))
+    model.add(Conv2D(256, kernel_size=(3, 3), activation="relu"))
     model.add(MaxPooling2D(pool_size=(2, 2)))
     model.add(Conv2D(64, kernel_size=(3, 3), activation="relu"))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(MaxPooling2D(pool_size=(3, 3)))
     model.add(Flatten())
-    model.add(Dense(256, activation="relu"))
-    model.add(Dense(128, activation="relu"))
-    model.add(Dense(STANFORD_NO_CLASSES, activation="softmax"))
+    model.add(Dense(100, activation="relu"))
+    model.add(Dense(STANFORD_NO_CLASSES, activation="sigmoid"))
 
     # Compile for training
     model.compile(
