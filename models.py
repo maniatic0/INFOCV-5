@@ -22,35 +22,41 @@ from tensorflow.keras.layers import (
 from tensorflow.keras.losses import sparse_categorical_crossentropy
 from tensorflow.keras.optimizers import Adam
 
-#you need to do:
-#pip install tensorflow-addons
+# you need to do:
+# pip install tensorflow-addons
 from tensorflow_addons.optimizers import CyclicalLearningRate
 
-def cyclicalLRate():
+
+def cyclicalLRate(
+    initial_learning_rate=3e-7,
+    maximal_learning_rate=3e-5,
+    step_size=1130,
+    scale_fn=lambda x: 1 / (2.0 ** (x - 1)),
+):
     cyclical_learning_rate = CyclicalLearningRate(
-     initial_learning_rate=3e-7,
-     maximal_learning_rate=3e-5,
-     step_size=1130,
-     scale_fn=lambda x: 1 / (2.0 ** (x - 1)),
-     scale_mode='cycle')
+        initial_learning_rate=initial_learning_rate,
+        maximal_learning_rate=maximal_learning_rate,
+        step_size=step_size,
+        scale_fn=scale_fn,
+        scale_mode="cycle",
+    )
 
     return cyclical_learning_rate
+
 
 # function for creating a naive inception block
 def inception_module(layer_in, f1, f2, f3):
     # 1x1 conv
-    conv1 = Conv2D(f1, (1,1), padding='same', activation='relu')(layer_in)
+    conv1 = Conv2D(f1, (1, 1), padding="same", activation="relu")(layer_in)
     # 3x3 conv
-    conv3 = Conv2D(f2, (3,3), padding='same', activation='relu')(layer_in)
+    conv3 = Conv2D(f2, (3, 3), padding="same", activation="relu")(layer_in)
     # 5x5 conv
-    conv5 = Conv2D(f3, (5,5), padding='same', activation='relu')(layer_in)
+    conv5 = Conv2D(f3, (5, 5), padding="same", activation="relu")(layer_in)
     # 3x3 max pooling
-    pool = MaxPooling2D((3,3), strides=(1,1), padding='same')(layer_in)
+    pool = MaxPooling2D((3, 3), strides=(1, 1), padding="same")(layer_in)
     # concatenate filters, assumes filters/channels last
     layer_out = concatenate([conv1, conv3, conv5, pool], axis=-1)
     return layer_out
-
-
 
 
 def stanfordModel():
@@ -89,7 +95,7 @@ def transferModel(stanfordModel):
     # Compile for training
     model.compile(
         loss=sparse_categorical_crossentropy,
-        optimizer=Adam(learning_rate=0.01),
+        optimizer=Adam(learning_rate=cyclicalLRate(maximal_learning_rate=3e-6)),
         metrics=["accuracy"],
     )
 
@@ -104,29 +110,28 @@ def opticalFlowModel():
     x = TimeDistributed(MaxPooling2D(pool_size=(2, 2)))(
         x
     )  # Needs this due to time in the flow
+    x = TimeDistributed(Dropout(0.5))(x)  # Needs this due to time in the flow
     x = TimeDistributed(Conv2D(32, kernel_size=(3, 3), activation="relu"))(
         x
     )  # Needs this due to time in the flow
-    x = Conv3D(8, kernel_size=(3, 3, 3))(
-        x
-    )  # Maybe only use time distribution and then maxpooling 3d?
-    x = MaxPooling3D(pool_size=(8, 1, 1))(x)  # Way of reducing dimentionality
+    x = MaxPooling3D(pool_size=(x.shape[1], 1, 1))(x)  # Way of reducing dimentionality
     # print(x.shape) # use this to debug dimentionality. It needs to be (None, 1, W, H, D)
     x = Reshape(x.shape[2:])(x)  # (None, 1, 122, 122, 64) -> (None, 122, 122, 64)
+    x = Dropout(0.5)(x)
     x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
     x = MaxPooling2D(pool_size=(2, 2))(x)
+    x = Dropout(0.5)(x)
     x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
-    x = MaxPooling2D(pool_size=(2, 2))(x)
     x = Flatten()(x)
     x = Dense(256, activation="relu")(x)
-    x = Dense(128, activation="relu")(x)
+    x = Dropout(0.5)(x)
     outputs = Dense(TVHI_NO_CLASSES, activation="softmax")(x)
     model = Model(inputs, outputs, name="Optical_Flow")
 
     # Compile for training
     model.compile(
         loss=sparse_categorical_crossentropy,
-        optimizer=Adam(learning_rate=0.01),
+        optimizer=Adam(learning_rate=cyclicalLRate(maximal_learning_rate=3e-3)),
         metrics=["accuracy"],
     )
 
@@ -150,7 +155,7 @@ def twoStreamsModel(oneModel, flowModel):
     # Compile for training
     model.compile(
         loss=sparse_categorical_crossentropy,
-        optimizer=Adam(learning_rate=0.01),
+        optimizer=Adam(learning_rate=cyclicalLRate(maximal_learning_rate=3e-3)),
         metrics=["accuracy"],
     )
 

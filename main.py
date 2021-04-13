@@ -47,11 +47,13 @@ def loadModel(name):
     # Load Model
     return tf.keras.models.load_model(str(MODELS_FOLDER / filename))
 
+
 def saveModelWeights(name, model):
     filename = name.lower()
     weights_folder = TESTING_FOLDER / filename
     createIfNecessaryDir(weights_folder)
     model.save_weights(weights_folder / "weights")
+
 
 def loadModelWeights(name, model):
     filename = name.lower()
@@ -78,7 +80,7 @@ def trainAndTestModel(
     verbosity = 1
 
     # Early stopping to avoid overfitting
-    patience = int(math.ceil(0.05 * no_epochs))
+    patience = int(math.ceil(0.1 * no_epochs))
     monitor = "val_loss"
     mode = "min"
 
@@ -177,10 +179,10 @@ def main():
 
     load_stanford = True
     load_transfer = False
-    load_flow = True
-    load_dual = True
+    load_flow = False
+    load_dual = False
     loading_options = [load_stanford, load_transfer, load_flow, load_dual]
-    
+
     # Load Datasets
     training_stanford, validation_stanford, testing_stanford = loadStanfordDatasets()
     training_tvhi_rgb, validation_tvhi_rgb, testing_tvhi_rgb = loadTVHIRGB()
@@ -233,7 +235,7 @@ def main():
 
     # Generate Flow Model
     name_flow, model_flow = opticalFlowModel()
-    
+
     if not load_flow:
         # Train From Scratch
 
