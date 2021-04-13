@@ -6,7 +6,7 @@ from utils import (
     getDirSize,
     saveModelSummary,
 )
-from prepare_stanford import loadStanfordDatasets
+from prepare_stanford import loadStanfordDatasets, BATCH_SIZE
 from optical_flow import loadTVHIRGB, loadFlowTVHI, loadDualTVHI
 from models import stanfordModel, transferModel, opticalFlowModel, twoStreamsModel
 from colab_test import RUNNING_IN_COLAB
@@ -36,6 +36,30 @@ TESTING_FOLDER = ROOT / "testing"
 createIfNecessaryDir(TESTING_FOLDER)
 
 
+def saveModel(name, model):
+    filename = name.lower()
+    # Save Model
+    model.save(MODELS_FOLDER / filename)
+
+
+def loadModel(name):
+    filename = name.lower()
+    # Load Model
+    return tf.keras.models.load_model(str(MODELS_FOLDER / filename))
+
+def saveModelWeights(name, model):
+    filename = name.lower()
+    weights_folder = TESTING_FOLDER / filename
+    createIfNecessaryDir(weights_folder)
+    model.save_weights(weights_folder / "weights")
+
+def loadModelWeights(name, model):
+    filename = name.lower()
+    weights_folder = TESTING_FOLDER / filename / "weights"
+    model.load_weights(str(weights_folder))
+    return model
+
+
 def trainAndTestModel(
     name,
     model,
@@ -49,12 +73,12 @@ def trainAndTestModel(
     filename = name.lower()
 
     # Training parameters
-    no_epochs = 2
-    batch_size = 64
+    no_epochs = 500
+    batch_size = BATCH_SIZE
     verbosity = 1
 
     # Early stopping to avoid overfitting
-    patience = int(math.ceil(0.3 * no_epochs))
+    patience = int(math.ceil(0.05 * no_epochs))
     monitor = "val_loss"
     mode = "min"
 
@@ -89,12 +113,10 @@ def trainAndTestModel(
         model.load_weights(tmpdirname)
 
         # Save Model
-        model.save(MODELS_FOLDER / filename)
+        saveModel(name, model)
 
         # Save Weights
-        weights_folder = TESTING_FOLDER / filename
-        createIfNecessaryDir(weights_folder)
-        model.save_weights(weights_folder / "weights")
+        saveModelWeights(name, model)
 
         plotTrainingHistory(
             HISTORY_FOLDER,
@@ -152,6 +174,12 @@ def trainAndTestModel(
 
 
 def main():
+
+    load_stanford = True
+    load_transfer = False
+    load_flow = True
+    load_dual = True
+    loading_options = [load_stanford, load_transfer, load_flow, load_dual]
     
     # Load Datasets
     training_stanford, validation_stanford, testing_stanford = loadStanfordDatasets()
@@ -159,85 +187,95 @@ def main():
     training_tvhi_flow, validation_tvhi_flow, testing_tvhi_flow = loadFlowTVHI()
     training_tvhi_dual, validation_tvhi_dual, testing_tvhi_dual = loadDualTVHI()
 
-    # Load Stanford Model
+    # Generate Stanford Model
     name_stanford, model_stanford = stanfordModel()
 
-    # Save Stanford Model Summary
-    saveModelSummary(MODELS_FOLDER, name_stanford, model_stanford)
+    if not load_stanford:
+        # Train from scratch
 
-    # Train Stanford Model
-    model_stanford, results_stanford = trainAndTestModel(
-        name_stanford,
-        model_stanford,
-        training_stanford,
-        validation_stanford,
-        testing_stanford,
-        (10000, 10000),
-    )
+        # Save Stanford Model Summary
+        saveModelSummary(MODELS_FOLDER, name_stanford, model_stanford)
 
-    # Load Transfer Model
+        # Train Stanford Model
+        model_stanford, results_stanford = trainAndTestModel(
+            name_stanford,
+            model_stanford,
+            training_stanford,
+            validation_stanford,
+            testing_stanford,
+            (10000, 10000),
+        )
+    else:
+        # Load from previous
+        model_stanford = loadModelWeights(name_stanford, model_stanford)
+
+    # Generate Transfer Model
     name_transfer, model_transfer = transferModel(model_stanford)
 
-    # Save Transfer Model Summary
-    saveModelSummary(MODELS_FOLDER, name_transfer, model_transfer)
+    if not load_transfer:
+        # Train From Scratch
 
-    # Train Transfer Model
-    model_transfer, results_transfer = trainAndTestModel(
-        name_transfer,
-        model_transfer,
-        training_tvhi_rgb,
-        validation_tvhi_rgb,
-        testing_tvhi_rgb,
-    )
+        # Save Transfer Model Summary
+        saveModelSummary(MODELS_FOLDER, name_transfer, model_transfer)
 
-    # Load Second Model
-    name_transfer, model_transfer = transferModel(model_stanford)
+        # Train Transfer Model
+        model_transfer, results_transfer = trainAndTestModel(
+            name_transfer,
+            model_transfer,
+            training_tvhi_rgb,
+            validation_tvhi_rgb,
+            testing_tvhi_rgb,
+            history_max_y=300,
+        )
+    else:
+        # Load previous model
+        model_transfer = loadModelWeights(name_transfer, model_transfer)
 
-    # Save Second Model Summary
-    saveModelSummary(MODELS_FOLDER, name_transfer, model_transfer)
-
-    # Train Second Model
-    model_transfer, results_transfer = trainAndTestModel(
-        name_transfer,
-        model_transfer,
-        training_tvhi_rgb,
-        validation_tvhi_rgb,
-        testing_tvhi_rgb,
-        history_max_y=300,
-    )
-
-    # Load Flow Model
+    # Generate Flow Model
     name_flow, model_flow = opticalFlowModel()
+    
+    if not load_flow:
+        # Train From Scratch
 
-    # Save Flow Model Summary
-    saveModelSummary(MODELS_FOLDER, name_flow, model_flow)
+        # Save Flow Model Summary
+        saveModelSummary(MODELS_FOLDER, name_flow, model_flow)
 
-    # Train Flow Model
-    model_flow, results_flow = trainAndTestModel(
-        name_flow,
-        model_flow,
-        training_tvhi_flow,
-        validation_tvhi_flow,
-        testing_tvhi_flow,
-    )
+        # Train Flow Model
+        model_flow, results_flow = trainAndTestModel(
+            name_flow,
+            model_flow,
+            training_tvhi_flow,
+            validation_tvhi_flow,
+            testing_tvhi_flow,
+        )
+    else:
+        # Load previous model
+        model_flow = loadModelWeights(name_flow, model_flow)
 
-    # Load Two Stream Model
+    # Generate Two Stream Model
     name_dual, model_dual = twoStreamsModel(model_transfer, model_flow)
 
-    # Save Two Stream Model Summary
-    saveModelSummary(MODELS_FOLDER, name_dual, model_dual)
+    if not load_dual:
+        # Train From Scratch
 
-    # Train Two Stream Model
-    model_dual, results_dual = trainAndTestModel(
-        name_dual,
-        model_dual,
-        training_tvhi_dual,
-        validation_tvhi_dual,
-        testing_tvhi_dual,
-    )
+        # Save Two Stream Model Summary
+        saveModelSummary(MODELS_FOLDER, name_dual, model_dual)
+
+        # Train Two Stream Model
+        model_dual, results_dual = trainAndTestModel(
+            name_dual,
+            model_dual,
+            training_tvhi_dual,
+            validation_tvhi_dual,
+            testing_tvhi_dual,
+        )
+    else:
+        # Load previous model
+        model_dual = loadModelWeights(name_dual, model_dual)
 
     # Save Results
-    with open(TESTING_FOLDER / "models_values.csv", "w") as f:
+    trained_models = "".join(["0" if loaded else "1" for loaded in loading_options])
+    with open(TESTING_FOLDER / f"models_values_{trained_models}.csv", "w") as f:
         fieldnames = [
             "model_name",
             "test_loss",
@@ -250,10 +288,14 @@ def main():
         writer = csv.DictWriter(f, fieldnames=fieldnames)
 
         writer.writeheader()
-        writer.writerow(results_stanford)
-        writer.writerow(results_transfer)
-        writer.writerow(results_flow)
-        writer.writerow(results_dual)
+        if not load_stanford:
+            writer.writerow(results_stanford)
+        if not load_transfer:
+            writer.writerow(results_transfer)
+        if not load_flow:
+            writer.writerow(results_flow)
+        if not load_dual:
+            writer.writerow(results_dual)
 
 
 if __name__ == "__main__":
