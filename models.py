@@ -1,4 +1,4 @@
-from prepare_stanford import colorPreprocessingLayer, STANFORD_NO_CLASSES, IMAGE_SHAPE
+from prepare_stanford import colorPreprocessingLayer, STANFORD_NO_CLASSES, IMAGE_SHAPE, BATCH_SIZE
 from optical_flow import TVHI_NO_CLASSES, TVHI_FLOW_SHAPE
 from utils import CyclicalLearningRateLogger
 
@@ -95,7 +95,7 @@ def transferModel(stanfordModel):
     # Compile for training
     model.compile(
         loss=sparse_categorical_crossentropy,
-        optimizer=Adam(learning_rate=cyclicalLRate(maximal_learning_rate=3e-6)),
+        optimizer=Adam(learning_rate=cyclicalLRate(maximal_learning_rate=3e-6, step_size=5*BATCH_SIZE)),
         metrics=["accuracy"],
     )
 
@@ -131,7 +131,7 @@ def opticalFlowModel():
     # Compile for training
     model.compile(
         loss=sparse_categorical_crossentropy,
-        optimizer=Adam(learning_rate=cyclicalLRate(maximal_learning_rate=3e-3)),
+        optimizer=Adam(learning_rate=cyclicalLRate(maximal_learning_rate=1e-2, step_size=6*BATCH_SIZE)),
         metrics=["accuracy"],
     )
 
@@ -155,7 +155,7 @@ def twoStreamsModel(oneModel, flowModel):
     # Compile for training
     model.compile(
         loss=sparse_categorical_crossentropy,
-        optimizer=Adam(learning_rate=cyclicalLRate(maximal_learning_rate=3e-3)),
+        optimizer=Adam(learning_rate=cyclicalLRate(maximal_learning_rate=3e-4, step_size=5*BATCH_SIZE)),
         metrics=["accuracy"],
     )
 
