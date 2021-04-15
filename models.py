@@ -1,4 +1,9 @@
-from prepare_stanford import colorPreprocessingLayer, STANFORD_NO_CLASSES, IMAGE_SHAPE, BATCH_SIZE
+from prepare_stanford import (
+    colorPreprocessingLayer,
+    STANFORD_NO_CLASSES,
+    IMAGE_SHAPE,
+    BATCH_SIZE,
+)
 from optical_flow import TVHI_NO_CLASSES, TVHI_FLOW_SHAPE
 from utils import CyclicalLearningRateLogger
 
@@ -95,7 +100,11 @@ def transferModel(stanfordModel):
     # Compile for training
     model.compile(
         loss=sparse_categorical_crossentropy,
-        optimizer=Adam(learning_rate=cyclicalLRate(maximal_learning_rate=3e-6, step_size=5*BATCH_SIZE)),
+        optimizer=Adam(
+            learning_rate=cyclicalLRate(
+                maximal_learning_rate=3e-6, step_size=5 * BATCH_SIZE
+            )
+        ),
         metrics=["accuracy"],
     )
 
@@ -131,7 +140,11 @@ def opticalFlowModel():
     # Compile for training
     model.compile(
         loss=sparse_categorical_crossentropy,
-        optimizer=Adam(learning_rate=cyclicalLRate(maximal_learning_rate=1e-2, step_size=6*BATCH_SIZE)),
+        optimizer=Adam(
+            learning_rate=cyclicalLRate(
+                maximal_learning_rate=1e-2, step_size=6 * BATCH_SIZE
+            )
+        ),
         metrics=["accuracy"],
     )
 
@@ -141,13 +154,8 @@ def opticalFlowModel():
 def twoStreamsModel(oneModel, flowModel):
 
     combinedInput = concatenate([oneModel.output, flowModel.output])
-    # our final FC layer head will have two dense layers, the final one
-    # being our regression head
     x = Dense(4, activation="relu")(combinedInput)
     output = Dense(TVHI_NO_CLASSES, activation="softmax")(x)
-    # our final model will accept categorical/numerical data on the MLP
-    # input and images on the CNN input, outputting a single value (the
-    # predicted price of the house)
     model = Model(
         inputs=[oneModel.input, flowModel.input], outputs=output, name="Two_Stream"
     )
@@ -155,8 +163,170 @@ def twoStreamsModel(oneModel, flowModel):
     # Compile for training
     model.compile(
         loss=sparse_categorical_crossentropy,
-        optimizer=Adam(learning_rate=cyclicalLRate(maximal_learning_rate=3e-4, step_size=5*BATCH_SIZE)),
+        optimizer=Adam(
+            learning_rate=cyclicalLRate(
+                maximal_learning_rate=3e-4, step_size=5 * BATCH_SIZE
+            )
+        ),
         metrics=["accuracy"],
     )
 
     return ("Two_Stream", model)
+
+
+def hydraModel():
+    name = "Hydra"
+
+    def stanfordBody():
+        inputs = tf.keras.Input(shape=IMAGE_SHAPE)
+        x = colorPreprocessingLayer()(inputs)
+        x = Conv2D(256, kernel_size=(3, 3), activation="relu")(x)
+        x = Dropout(0.5)(x)
+        x = Conv2D(256, kernel_size=(3, 3), activation="relu")(x)
+        x = MaxPooling2D(pool_size=(2, 2))(x)
+        x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
+        output = MaxPooling2D(pool_size=(3, 3))(x)
+
+        model = Model(inputs=inputs, outputs=output, name="Stanford-Body")
+
+        return model
+
+    def stanfordHeadModel(body):
+        x = Flatten()(body.output)
+        x = Dense(100, activation="relu")(x)
+        output = Dense(STANFORD_NO_CLASSES, activation="softmax")(x)
+
+        model = Model(inputs=body.input, outputs=output, name="Stanford-Head")
+
+        # Compile for training
+        model.compile(
+            loss=sparse_categorical_crossentropy,
+            optimizer=Adam(learning_rate=cyclicalLRate()),
+            metrics=["accuracy"],
+        )
+
+        return ("Stanford-Head", model)
+
+    def flowBody():
+        inputs = tf.keras.Input(shape=TVHI_FLOW_SHAPE)
+        x = TimeDistributed(Conv2D(32, kernel_size=(3, 3), activation="relu"))(
+            inputs
+        )  # Needs this due to time in the flow
+        x = TimeDistributed(MaxPooling2D(pool_size=(2, 2)))(
+            x
+        )  # Needs this due to time in the flow
+        x = TimeDistributed(Dropout(0.5))(x)  # Needs this due to time in the flow
+        x = TimeDistributed(Conv2D(32, kernel_size=(3, 3), activation="relu"))(
+            x
+        )  # Needs this due to time in the flow
+        x = MaxPooling3D(pool_size=(x.shape[1], 1, 1))(
+            x
+        )  # Way of reducing dimentionality
+        # print(x.shape) # use this to debug dimentionality. It needs to be (None, 1, W, H, D)
+        x = Reshape(x.shape[2:])(x)  # (None, 1, 122, 122, 64) -> (None, 122, 122, 64)
+        x = Dropout(0.5)(x)
+        x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
+        output = MaxPooling2D(pool_size=(3, 3), padding="same")(x)
+
+        model = Model(inputs=inputs, outputs=output, name="Flow-Body")
+        return model
+
+    def transferFusion(stanford, flow):
+        output = concatenate([stanford_body.output, flow_body.output])
+
+        model = Model(
+            inputs=[stanford.input, flow.input], outputs=output, name="Transfer-Fusion"
+        )
+
+        return model
+
+    def flowFusion(stanford, flow):
+        output = concatenate([stanford_body.output, flow_body.output])
+
+        model = Model(
+            inputs=[stanford.input, flow.input], outputs=output, name="Flow-Fusion"
+        )
+
+        return model
+
+    def transferHead(body):
+        x = Dropout(0.5)(body.output)
+        x = Conv2D(256, kernel_size=(3, 3), activation="relu")(x)
+        x = MaxPooling2D(pool_size=(2, 2))(x)
+        x = Dropout(0.5)(x)
+        x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
+        x = Flatten()(x)
+        x = Dense(100, activation="relu")(x)
+        output = Dense(STANFORD_NO_CLASSES, activation="sigmoid")(x)
+
+        model = Model(inputs=body.input, outputs=output, name="Transfer-Head")
+
+        # Compile for training
+        model.compile(
+            loss=sparse_categorical_crossentropy,
+            optimizer=Adam(
+                learning_rate=cyclicalLRate(
+                    maximal_learning_rate=3e-6, step_size=5 * BATCH_SIZE
+                )
+            ),
+            metrics=["accuracy"],
+        )
+
+        return model
+
+    def flowHead(body):
+        x = Dropout(0.5)(body.output)
+        x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
+        x = Flatten()(x)
+        x = Dense(100, activation="relu")(x)
+        x = Dropout(0.5)(x)
+        outputs = Dense(TVHI_NO_CLASSES, activation="sigmoid")(x)
+
+        model = Model(body.input, outputs, name="Flow_Head")
+
+        # Compile for training
+        model.compile(
+            loss=sparse_categorical_crossentropy,
+            optimizer=Adam(
+                learning_rate=cyclicalLRate(
+                    maximal_learning_rate=1e-2, step_size=6 * BATCH_SIZE
+                )
+            ),
+            metrics=["accuracy"],
+        )
+
+        return model
+
+    def hydraHeadModel(transferFusedHead, flowFusedHead):
+        combinedInput = concatenate([transferFusedHead.output, flowFusedHead.output])
+        x = Dense(32, activation="relu")(combinedInput)
+        output = Dense(TVHI_NO_CLASSES, activation="softmax")(x)
+        model = Model(inputs=transferFusedHead.input, outputs=output, name=name)
+
+        # Compile for training
+        model.compile(
+            loss=sparse_categorical_crossentropy,
+            optimizer=Adam(
+                learning_rate=cyclicalLRate(
+                    maximal_learning_rate=3e-3, step_size=3 * BATCH_SIZE
+                )
+            ),
+            metrics=["accuracy"],
+        )
+
+        return (name, model)
+
+    stanford_body = stanfordBody()
+    stanford_model = stanfordHeadModel(stanford_body)
+
+    flow_body = flowBody()
+
+    transfer_fusion = transferFusion(stanford_body, flow_body)
+    flow_fusion = flowFusion(stanford_body, flow_body)
+
+    transfer_head = transferHead(transfer_fusion)
+    flow_head = flowHead(flow_fusion)
+
+    hydra_model = hydraHeadModel(transfer_head, flow_head)
+
+    return stanford_model, hydra_model

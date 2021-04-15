@@ -8,7 +8,13 @@ from utils import (
 )
 from prepare_stanford import loadStanfordDatasets, BATCH_SIZE
 from optical_flow import loadTVHIRGB, loadFlowTVHI, loadDualTVHI
-from models import stanfordModel, transferModel, opticalFlowModel, twoStreamsModel
+from models import (
+    stanfordModel,
+    transferModel,
+    opticalFlowModel,
+    twoStreamsModel,
+    hydraModel,
+)
 from colab_test import RUNNING_IN_COLAB
 
 from pathlib import Path
@@ -178,10 +184,11 @@ def trainAndTestModel(
 def main():
 
     load_stanford = True
-    load_transfer = False
-    load_flow = False
-    load_dual = False
-    loading_options = [load_stanford, load_transfer, load_flow, load_dual]
+    load_transfer = True
+    load_flow = True
+    load_dual = True
+    load_hydra = False
+    loading_options = [load_stanford, load_transfer, load_flow, load_dual, load_hydra]
 
     # Load Datasets
     training_stanford, validation_stanford, testing_stanford = loadStanfordDatasets()
@@ -275,6 +282,44 @@ def main():
         # Load previous model
         model_dual = loadModelWeights(name_dual, model_dual)
 
+    # Generate Hydra Models
+    (name_hydra_stanford, model_hydra_stanford), (
+        name_hydra,
+        model_hydra,
+    ) = hydraModel()
+
+    if not load_hydra:
+        # Train From Scratch
+
+        # Save Hydra Stanford Head Model Summary
+        saveModelSummary(MODELS_FOLDER, name_hydra_stanford, model_hydra_stanford)
+
+        # Train Hydra Stanford Head
+        model_hydra_stanford, results_hydra_stanford = trainAndTestModel(
+            name_hydra_stanford,
+            model_hydra_stanford,
+            training_stanford,
+            validation_stanford,
+            testing_stanford,
+            (10000, 10000),
+        )
+
+        # Save Hydra Model Summary
+        saveModelSummary(MODELS_FOLDER, name_hydra, model_hydra)
+
+        # Train Hydra Model
+        model_hydra, results_hydra = trainAndTestModel(
+            name_hydra,
+            model_hydra,
+            training_tvhi_dual,
+            validation_tvhi_dual,
+            testing_tvhi_dual,
+        )
+
+    else:
+        # Load previous model
+        model_hydra = loadModelWeights(name_hydra, model_hydra)
+
     # Save Results
     trained_models = "".join(["0" if loaded else "1" for loaded in loading_options])
     with open(TESTING_FOLDER / f"models_values_{trained_models}.csv", "w") as f:
@@ -298,6 +343,9 @@ def main():
             writer.writerow(results_flow)
         if not load_dual:
             writer.writerow(results_dual)
+        if not load_hydra:
+            writer.writerow(results_hydra_stanford)
+            writer.writerow(results_hydra)
 
 
 if __name__ == "__main__":
