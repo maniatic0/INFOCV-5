@@ -85,9 +85,12 @@ def stanfordModel():
     x = MaxPooling2D(pool_size=(3,3))(x)
     x = inception_module(x, 96, 128, 128, 32, 64, 64)
     x = Dropout(0.5)(x)
+    x = inception_module(x, 96, 128, 128, 32, 64, 64)
+    x = Dropout(0.5)(x)
     x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
     x = MaxPooling2D(pool_size=(3,3))(x)
     x = Conv2D(256, kernel_size=(2, 2), activation="relu")(x)
+    x = Dropout(0.5)(x)
     x = MaxPooling2D(pool_size=(3,3))(x)
     x = Flatten()(x)
     
