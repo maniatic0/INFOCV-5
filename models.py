@@ -60,10 +60,10 @@ def inception_module(layer_in, f1, f2, f3):
 
 
 def stanfordModel():
-    model = Sequential(name="Stanford")
+    """model = Sequential(name="Stanford")
     model.add(colorPreprocessingLayer())
     model.add(Conv2D(256, kernel_size=(3, 3), activation="relu"))
-    model.add(Dropout(0.5))
+    model.add(Dropout(0.3))
     model.add(Conv2D(256, kernel_size=(3, 3), activation="relu"))
     model.add(MaxPooling2D(pool_size=(2, 2)))
     model.add(Conv2D(64, kernel_size=(3, 3), activation="relu"))
@@ -71,15 +71,39 @@ def stanfordModel():
     model.add(Flatten())
     model.add(Dense(100, activation="relu"))
     model.add(Dense(STANFORD_NO_CLASSES, activation="sigmoid"))
-
+    
     # Compile for training
     model.compile(
         loss=sparse_categorical_crossentropy,
         optimizer=Adam(learning_rate=cyclicalLRate()),
         metrics=["accuracy"],
+    )"""
+    
+    inputs = tf.keras.Input(shape=IMAGE_SHAPE)
+    x = colorPreprocessingLayer()(inputs, training=True)
+    x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
+    x = MaxPooling2D(pool_size=(3,3))(x)
+    x = inception_module(x, 96, 128, 128, 32, 64, 64)
+    x = Dropout(0.5)(x)
+    x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
+    x = MaxPooling2D(pool_size=(3,3))(x)
+    x = Conv2D(256, kernel_size=(2, 2), activation="relu")(x)
+    x = MaxPooling2D(pool_size=(3,3))(x)
+    x = Flatten()(x)
+    
+    x = Dense(200, activation="relu")(x)
+    x = Dropout(0.5)(x)
+    outputs = Dense(STANFORD_NO_CLASSES, activation="softmax")(x)
+    
+    model = Model(inputs, outputs, name="Stanford")
+    model.compile(
+        loss='sparse_categorical_crossentropy',
+        optimizer=Adam(learning_rate=cyclicalLRate(maximal_learning_rate=1e-4)),
+        metrics=["accuracy"],
     )
-
+    
     return ("Stanford", model)
+
 
 
 def transferModel(stanfordModel):
