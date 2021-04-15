@@ -284,7 +284,7 @@ def hydraModel():
         x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
         x = Flatten()(x)
         x = Dense(100, activation="relu")(x)
-        output = Dense(STANFORD_NO_CLASSES, activation="sigmoid")(x)
+        output = Dense(TVHI_NO_CLASSES, activation="sigmoid")(x)
 
         model = Model(inputs=body.input, outputs=output, name="Transfer-Head")
 
