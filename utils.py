@@ -11,6 +11,7 @@ from keras.callbacks import Callback
 
 import math
 import os
+import operator
 
 #you need to do:
 #pip install tensorflow-addons
@@ -234,15 +235,23 @@ def saveModelsSummary(folder, models):
 
 
 class BestEpochCallback(Callback):
-    def __init__(self, weights_filename, *args, **kwargs):
+    def __init__(self, weights_filename, monitor="val_accuracy", mode="max", *args, **kwargs):
         super(BestEpochCallback, self).__init__(*args, **kwargs)
         self.weights_filename = weights_filename
-        self.monitor = "val_loss"
+        self.monitor = monitor
+        self.mode = mode
+        if  self.mode == "max":
+            self.comp = operator.gt
+        else:
+            self.comp = operator.lt
         self.reset()
 
     def reset(self):
         self.bestEpoch = -1
-        self.bestValue = math.inf
+        if self.mode == "max":
+            self.bestValue = -math.inf
+        else:
+            self.bestValue = math.inf
 
     def get_monitor_value(self, logs):
         # From https://github.com/tensorflow/tensorflow/blob/v2.4.1/tensorflow/python/keras/callbacks.py#L1660-L1791
@@ -259,7 +268,7 @@ class BestEpochCallback(Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         value = self.get_monitor_value(logs)
-        if value < self.bestValue:
+        if self.comp(value, self.bestValue):
             self.bestEpoch = epoch
             self.bestValue = value
             self.bestWeights = self.model.save_weights(
