@@ -92,7 +92,7 @@ def plotTrainingHistory(
     plt.ylabel("Accuracy")
 
     plt.ylim(0.0, 1.0)
-    plt.xticks(range(1, epoch_number + 1))
+    plt.xticks(range(1, epoch_number + 1, max(int(epoch_number * 0.1), 1)))
 
     # Draw everything
     plt.plot(
