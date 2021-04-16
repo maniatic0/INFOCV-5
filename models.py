@@ -20,9 +20,12 @@ from tensorflow.keras.layers import (
     MaxPooling3D,
     Dropout,
     AveragePooling2D,
+    AveragePooling3D,
     TimeDistributed,
     Reshape,
     concatenate,
+    Conv2DTranspose,
+    DepthwiseConv2D,
 )
 from tensorflow.keras.losses import sparse_categorical_crossentropy
 from tensorflow.keras.optimizers import Adam
@@ -189,13 +192,14 @@ def hydraModel():
 
     def stanfordBody():
         inputs = tf.keras.Input(shape=IMAGE_SHAPE)
-        x = colorPreprocessingLayer()(inputs)
-        x = Conv2D(256, kernel_size=(3, 3), activation="relu")(x)
-        x = Dropout(0.5)(x)
-        x = Conv2D(256, kernel_size=(3, 3), activation="relu")(x)
-        x = MaxPooling2D(pool_size=(2, 2))(x)
+        x = colorPreprocessingLayer()(inputs, training=True)
         x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
-        output = MaxPooling2D(pool_size=(3, 3))(x)
+        x = MaxPooling2D(pool_size=(3, 3))(x)
+        x = inception_module(x, 96, 128, 128, 32, 64, 64)
+        x = Dropout(0.5)(x)
+        x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
+        x = MaxPooling2D(pool_size=(3, 3))(x)
+        output = Conv2D(64, kernel_size=(2, 2), activation="relu")(x)
 
         model = Model(inputs=inputs, outputs=output, name="Stanford-Body")
 
@@ -203,7 +207,8 @@ def hydraModel():
 
     def stanfordHeadModel(body):
         x = Flatten()(body.output)
-        x = Dense(100, activation="relu")(x)
+        x = Dense(200, activation="relu")(x)
+        x = Dropout(0.5)(x)
         output = Dense(STANFORD_NO_CLASSES, activation="softmax")(x)
 
         model = Model(inputs=body.input, outputs=output, name="Stanford-Head")
@@ -211,7 +216,7 @@ def hydraModel():
         # Compile for training
         model.compile(
             loss=sparse_categorical_crossentropy,
-            optimizer=Adam(learning_rate=cyclicalLRate()),
+            optimizer=Adam(learning_rate=cyclicalLRate(maximal_learning_rate=1e-4)),
             metrics=["accuracy"],
         )
 
@@ -229,20 +234,18 @@ def hydraModel():
         x = TimeDistributed(Conv2D(32, kernel_size=(3, 3), activation="relu"))(
             x
         )  # Needs this due to time in the flow
-        x = MaxPooling3D(pool_size=(x.shape[1], 1, 1))(
+        x = AveragePooling3D(pool_size=(x.shape[1], 1, 1))(
             x
         )  # Way of reducing dimentionality
         # print(x.shape) # use this to debug dimentionality. It needs to be (None, 1, W, H, D)
-        x = Reshape(x.shape[2:])(x)  # (None, 1, 122, 122, 64) -> (None, 122, 122, 64)
-        x = Dropout(0.5)(x)
-        x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
-        output = MaxPooling2D(pool_size=(3, 3), padding="same")(x)
+        output = Reshape(x.shape[2:])(x)
 
         model = Model(inputs=inputs, outputs=output, name="Flow-Body")
         return model
 
     def transferFusion(stanford, flow):
-        output = concatenate([stanford_body.output, flow_body.output])
+        downsampling = AveragePooling2D(pool_size=(5, 5), strides=(5, 5))(flow.output)
+        output = concatenate([stanford.output, downsampling])
 
         model = Model(
             inputs=[stanford.input, flow.input], outputs=output, name="Transfer-Fusion"
@@ -251,7 +254,13 @@ def hydraModel():
         return model
 
     def flowFusion(stanford, flow):
-        output = concatenate([stanford_body.output, flow_body.output])
+        upsampling = Conv2DTranspose(
+            stanford.output.shape[3],
+            (6, 6),
+            strides=(5, 5),
+            data_format="channels_last",
+        )(stanford.output)
+        output = concatenate([upsampling, flow_body.output])
 
         model = Model(
             inputs=[stanford.input, flow.input], outputs=output, name="Flow-Fusion"
@@ -263,11 +272,11 @@ def hydraModel():
         x = Dropout(0.5)(body.output)
         x = Conv2D(256, kernel_size=(3, 3), activation="relu")(x)
         x = MaxPooling2D(pool_size=(2, 2))(x)
-        x = Dropout(0.5)(x)
-        x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
+        x = DepthwiseConv2D((2, 2))(x)
         x = Flatten()(x)
         x = Dense(100, activation="relu")(x)
-        output = Dense(TVHI_NO_CLASSES, activation="sigmoid")(x)
+        x = Dropout(0.5)(x)
+        output = Dense(TVHI_NO_CLASSES, activation="softmax")(x)
 
         model = Model(inputs=body.input, outputs=output, name="Transfer-Head")
 
@@ -287,6 +296,8 @@ def hydraModel():
     def flowHead(body):
         x = Dropout(0.5)(body.output)
         x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
+        x = AveragePooling2D(pool_size=(4, 4), strides=(2, 2))(x)
+        x = DepthwiseConv2D((2, 2))(x)
         x = Flatten()(x)
         x = Dense(100, activation="relu")(x)
         x = Dropout(0.5)(x)
@@ -318,7 +329,9 @@ def hydraModel():
             loss=sparse_categorical_crossentropy,
             optimizer=Adam(
                 learning_rate=cyclicalLRate(
-                    maximal_learning_rate=3e-3, step_size=3 * BATCH_SIZE
+                    initial_learning_rate=3e-6,
+                    maximal_learning_rate=3e-2,
+                    step_size=10 * BATCH_SIZE,
                 )
             ),
             metrics=["accuracy"],
