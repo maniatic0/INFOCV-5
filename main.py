@@ -183,11 +183,11 @@ def trainAndTestModel(
 
 def main():
 
-    load_stanford = True
-    load_transfer = True
-    load_flow = True
-    load_dual = True
-    load_hydra = False
+    load_stanford = False
+    load_transfer = False
+    load_flow = False
+    load_dual = False
+    load_hydra = True
     loading_options = [load_stanford, load_transfer, load_flow, load_dual, load_hydra]
 
     # Load Datasets
