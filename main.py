@@ -87,8 +87,8 @@ def trainAndTestModel(
 
     # Early stopping to avoid overfitting
     patience = int(math.ceil(0.1 * no_epochs))
-    monitor = "val_loss"
-    mode = "min"
+    monitor = "val_accuracy"
+    mode = "max"
 
     # Callbacks for training
     callbacks = []

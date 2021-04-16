@@ -26,6 +26,7 @@ from tensorflow.keras.layers import (
     concatenate,
     Conv2DTranspose,
     DepthwiseConv2D,
+    SeparableConv2D
 )
 from tensorflow.keras.losses import sparse_categorical_crossentropy
 from tensorflow.keras.optimizers import Adam
@@ -216,7 +217,7 @@ def hydraModel():
         # Compile for training
         model.compile(
             loss=sparse_categorical_crossentropy,
-            optimizer=Adam(learning_rate=cyclicalLRate(maximal_learning_rate=1e-4)),
+            optimizer=Adam(learning_rate=cyclicalLRate(maximal_learning_rate=1e-3)),
             metrics=["accuracy"],
         )
 
@@ -272,7 +273,7 @@ def hydraModel():
         x = Dropout(0.5)(body.output)
         x = Conv2D(256, kernel_size=(3, 3), activation="relu")(x)
         x = MaxPooling2D(pool_size=(2, 2))(x)
-        x = DepthwiseConv2D((2, 2))(x)
+        x = SeparableConv2D(20, (2, 2))(x)
         x = Flatten()(x)
         x = Dense(100, activation="relu")(x)
         x = Dropout(0.5)(x)
@@ -297,7 +298,7 @@ def hydraModel():
         x = Dropout(0.5)(body.output)
         x = Conv2D(64, kernel_size=(3, 3), activation="relu")(x)
         x = AveragePooling2D(pool_size=(4, 4), strides=(2, 2))(x)
-        x = DepthwiseConv2D((2, 2))(x)
+        x = SeparableConv2D(10, (2, 2), strides=(2, 2))(x)
         x = Flatten()(x)
         x = Dense(100, activation="relu")(x)
         x = Dropout(0.5)(x)
@@ -329,8 +330,8 @@ def hydraModel():
             loss=sparse_categorical_crossentropy,
             optimizer=Adam(
                 learning_rate=cyclicalLRate(
-                    initial_learning_rate=3e-6,
-                    maximal_learning_rate=3e-2,
+                    initial_learning_rate=3e-7,
+                    maximal_learning_rate=3e-3,
                     step_size=10 * BATCH_SIZE,
                 )
             ),
