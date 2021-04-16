@@ -51,6 +51,9 @@ def plotTrainingHistory(
 ):
     """Plot training history"""
 
+    # Resolution info
+    x_res, y_res = res_pixel
+
     # Calculate epoch info
     epoch_number = len(next(iter(history.values())))
 
@@ -77,6 +80,7 @@ def plotTrainingHistory(
     # Draw legend
     plt.legend(loc="lower left")
 
+    fig.set_size_inches(x_res / 100.0, y_res / 100.0)  # 1920x1080
     fig.tight_layout()
     if RUNNING_IN_COLAB:
         # On Google Colab is better to show the image
@@ -109,7 +113,6 @@ def plotTrainingHistory(
     # Draw legend
     plt.legend(loc="lower left")
 
-    x_res, y_res = res_pixel
     fig.set_size_inches(x_res / 100.0, y_res / 100.0)  # 1920x1080
     fig.tight_layout()
     if RUNNING_IN_COLAB:
